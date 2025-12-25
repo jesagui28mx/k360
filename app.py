@@ -97,7 +97,7 @@ def obtener_tasa_admin(monto_mensual, plazo):
 
 # --- APP STREAMLIT ---
 
-st.title("🛡️ Simulador Profesional Krece360")
+st.title("🛡️ Simulador Krece360")
 st.markdown("Herramienta de proyección financiera neta.")
 
 col_main, col_sidebar = st.columns([3, 1])
