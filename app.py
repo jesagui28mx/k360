@@ -26,7 +26,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- CLASE PDF (LOGOTIPO DINÁMICO Y FECHA) ---
+# --- CLASE PDF (LOGOTIPO DINÁMICO, FECHA Y DISCLAIMER) ---
 class PDFReport(FPDF):
     def __init__(self, logo_path=None):
         super().__init__()
@@ -50,10 +50,25 @@ class PDFReport(FPDF):
         self.set_font('Arial', 'I', 10)
         self.cell(0, 10, f'Fecha: {self.fecha_actual}', 0, 1, 'R')
         
+        # Salto inicial del header
         self.ln(5)
 
     def footer(self):
+        # --- AVISO LEGAL (DISCLAIMER) ---
+        self.set_y(-32) # Subimos la posición para que quepa el texto legal
+        self.set_font('Arial', '', 7)
+        self.set_text_color(100, 100, 100) # Color gris para no distraer
+        
+        disclaimer = (
+            "AVISO LEGAL: Este documento es una simulación de carácter exclusivamente informativo y no constituye una cotización formal "
+            "ni una oferta vinculante por parte de una compañía de seguros. Los rendimientos y montos son estimados. "
+            "Para obtener una cotización oficial y proceder a la contratación, por favor comuníquese con su asesor certificado."
+        )
+        self.multi_cell(0, 3, disclaimer, 0, 'C') # Centrado y con salto de línea automático
+
+        # --- PAGINACIÓN ---
         self.set_y(-15)
+        self.set_text_color(0, 0, 0) # Volvemos a color negro
         self.set_font('Arial', 'I', 8)
         self.cell(0, 10, f'Página {self.page_no()} | Generado con Simulador Krece360', 0, 0, 'C')
 
@@ -62,6 +77,10 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         # Pasamos la ruta del logo al constructor
         pdf = PDFReport(logo_path=ruta_logo_temp)
         pdf.add_page()
+        
+        # --- CORRECCIÓN DE ESPACIO PARA LOGO ---
+        pdf.ln(15) # Espacio vertical extra para que el texto no choque con el logo
+        
         pdf.set_font("Arial", size=12)
         
         # Título y Datos Cliente
@@ -74,13 +93,21 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         
         # Resumen Financiero
         pdf.set_fill_color(240, 242, 246)
-        pdf.rect(10, pdf.get_y(), 190, 40, 'F')
-        pdf.ln(5)
+        
+        # Guardamos posición Y para dibujar rectángulo
+        y_actual = pdf.get_y()
+        pdf.rect(10, y_actual, 190, 40, 'F')
+        
+        # Movemos el cursor dentro del cuadro
+        pdf.set_y(y_actual + 5)
+        
         pdf.set_font("Arial", 'B', 12)
         pdf.cell(0, 10, f"   Aportación Mensual: ${datos_fin['aporte_mensual']:,.2f}", 0, 1)
         pdf.cell(0, 10, f"   Saldo Estimado al Retiro: ${datos_fin['saldo_final']:,.2f}", 0, 1)
         pdf.cell(0, 10, f"   Beneficio SAT Estimado: ${datos_fin['beneficio_sat']:,.2f}", 0, 1)
-        pdf.ln(10)
+        
+        # Salimos del área del rectángulo
+        pdf.set_y(y_actual + 45)
         
         # Nota Fiscal
         pdf.set_font("Arial", 'B', 12)
