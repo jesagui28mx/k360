@@ -129,7 +129,7 @@ else:
 # --- 4. INTERFAZ PRINCIPAL (MAIN DASHBOARD) ---
 
 st.title("🛡️ Simulador Krece360")
-st.markdown("Herramienta de proyección financiera neta.")
+st.markdown("Herramienta de proyección financiera realista.")
 
 # --- ALERTA INTELIGENTE (AQUÍ APARECE SI HAY EXCEDENTE) ---
 if mostrar_alerta:
