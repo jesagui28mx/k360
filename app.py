@@ -137,7 +137,7 @@ if mostrar_alerta:
     ⚠️ **¡Atención! Tu aportación excede el límite deducible.**
     
     Estás aportando **\${aportacion_primer_ano:,.2f}** anuales.
-    Toma en consideración que lo deducible es **\${tope_deducible_anual:,.2f}**.
+    Toma en consideración que lo deducible son **\${tope_deducible_anual:,.2f}**.
     
     * Monto que SÍ deduce impuestos: **\${tope_deducible_anual:,.2f}**
     * Excedente (No deducible): **\${excedente:,.2f}**
