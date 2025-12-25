@@ -2,11 +2,13 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import altair as alt
+from fpdf import FPDF
+import base64
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Simulador Krece360", layout="wide", page_icon="🛡️")
 
-# --- ESTILOS CSS PARA QUE SE VEA COMO TU DISEÑO ORIGINAL ---
+# --- ESTILOS CSS ---
 st.markdown("""
 <style>
     .metric-card {
@@ -22,9 +24,66 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# --- CLASE PDF (RECUPERADA Y MEJORADA) ---
+class PDFReport(FPDF):
+    def header(self):
+        try:
+            self.image('logo.png', 10, 8, 33) 
+        except Exception:
+            pass 
+        self.set_font('Arial', 'B', 15)
+        self.cell(40) 
+        self.cell(0, 10, 'Krece360 - Proyección Financiera', 0, 1, 'L')
+        self.ln(10)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font('Arial', 'I', 8)
+        self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
+
+def crear_pdf(datos_cliente, datos_fin, datos_fiscales):
+    try:
+        pdf = PDFReport()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+        
+        # Título y Datos Cliente
+        pdf.set_font("Arial", 'B', 14)
+        pdf.cell(0, 10, f"Propuesta para: {datos_cliente['nombre']}", 0, 1)
+        pdf.set_font("Arial", size=12)
+        pdf.cell(0, 10, f"Edad Actual: {datos_cliente['edad']} | Edad Retiro: {datos_cliente['retiro']}", 0, 1)
+        pdf.cell(0, 10, f"Estrategia: {datos_cliente['estrategia']}", 0, 1)
+        pdf.ln(5)
+        
+        # Resumen Financiero
+        pdf.set_fill_color(240, 242, 246)
+        pdf.rect(10, pdf.get_y(), 190, 40, 'F')
+        pdf.ln(5)
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(0, 10, f"   Aportación Mensual: ${datos_fin['aporte_mensual']:,.2f}", 0, 1)
+        pdf.cell(0, 10, f"   Saldo Estimado al Retiro: ${datos_fin['saldo_final']:,.2f}", 0, 1)
+        pdf.cell(0, 10, f"   Beneficio SAT Estimado: ${datos_fin['beneficio_sat']:,.2f}", 0, 1)
+        pdf.ln(10)
+        
+        # Nota Fiscal
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(0, 10, "Análisis Fiscal:", 0, 1)
+        pdf.set_font("Arial", size=11)
+        pdf.multi_cell(0, 8, datos_fiscales['texto_analisis'])
+        
+        if datos_fiscales['alerta_excedente']:
+            pdf.ln(5)
+            pdf.set_text_color(200, 0, 0)
+            pdf.multi_cell(0, 8, f"NOTA: {datos_fiscales['alerta_excedente']}")
+            pdf.set_text_color(0, 0, 0)
+
+        return pdf.output(dest='S').encode('latin-1', 'replace'), None
+    except Exception as e:
+        return None, str(e)
+
 # --- 1. SIDEBAR (DATOS DEL PROSPECTO Y CONFIGURACIÓN) ---
 with st.sidebar:
-    st.image("https://via.placeholder.com/150x50?text=Logo+Krece360", use_column_width=True) # Tu logo aquí
+    st.image("https://via.placeholder.com/150x50?text=Logo+Krece360", use_column_width=True) 
     st.header("⚙️ Parámetros")
     
     st.subheader("Datos del Prospecto")
@@ -40,7 +99,6 @@ with st.sidebar:
     st.subheader("Fiscalidad y Rendimiento")
     estrategia_fiscal = st.selectbox("Estrategia Fiscal", ["Art 151 (PPR - Deducible)", "Art 93 (No Deducible)"])
     
-    # --- AQUÍ ESTÁ LA NUEVA LÓGICA INTEGRADA EN EL SIDEBAR ---
     sueldo_anual = 0
     validar_sueldo = False
     
@@ -56,14 +114,12 @@ with st.sidebar:
     inflacion = st.checkbox("Considerar Inflación (4%)", value=True)
     tasa_inflacion = 0.04 if inflacion else 0.0
 
-# --- 2. CÁLCULOS MATEMÁTICOS (MOTOR) ---
+# --- 2. CÁLCULOS MATEMÁTICOS ---
 
-# Constantes 2024
 UMA_ANUAL = 39606.36
-TOPE_5_UMAS = UMA_ANUAL * 5  # ~198,031
-ISR_ESTIMADO = 0.30 # Para calcular cuánto devuelve hacienda aprox
+TOPE_5_UMAS = UMA_ANUAL * 5 
+ISR_ESTIMADO = 0.30 
 
-# Proyección
 plazo_anos = retiro - edad
 meses = plazo_anos * 12
 data = []
@@ -73,31 +129,23 @@ aporte_actual = ahorro_mensual
 total_aportado = 0
 acumulado_devoluciones = 0
 
-# Definir tope anual fiscal
 tope_deducible_anual = TOPE_5_UMAS
 if validar_sueldo and estrategia_fiscal == "Art 151 (PPR - Deducible)":
     tope_deducible_anual = min(TOPE_5_UMAS, sueldo_anual * 0.10)
 
-# Loop de proyección
 for i in range(1, meses + 1):
-    ano_actual = i // 12
-    
-    # Interés compuesto mensual
     rendimiento_mensual = saldo * (tasa_interes / 12)
     saldo += rendimiento_mensual + aporte_actual
     total_aportado += aporte_actual
     
-    # Ajuste inflación anual
     if i % 12 == 0 and inflacion:
         aporte_actual *= (1 + tasa_inflacion)
     
-    # Cálculo devoluciones (simplificado anualizado para la gráfica)
     devolucion_anual = 0
     if estrategia_fiscal == "Art 151 (PPR - Deducible)":
-        # Aportación anualizada simple para el cálculo gráfico
         aporte_anual_proyectado = aporte_actual * 12
         monto_deducible = min(aporte_anual_proyectado, tope_deducible_anual)
-        devolucion_anual = (monto_deducible * ISR_ESTIMADO) / 12 # Mensualizado para gráfica
+        devolucion_anual = (monto_deducible * ISR_ESTIMADO) / 12 
         acumulado_devoluciones += devolucion_anual
 
     data.append({
@@ -105,33 +153,34 @@ for i in range(1, meses + 1):
         "Año": edad + (i/12),
         "Saldo Neto": saldo,
         "Aportado": total_aportado,
-        "Devoluciones SAT": acumulado_devoluciones * ((1+tasa_interes)**(plazo_anos - (i/12))) # Valor futuro aprox de las devoluciones
+        "Devoluciones SAT": acumulado_devoluciones * ((1+tasa_interes)**(plazo_anos - (i/12)))
     })
 
 df = pd.DataFrame(data)
 
-# --- 3. LÓGICA DE ALERTAS (EL CÓDIGO NUEVO) ---
+# --- 3. LÓGICA DE ALERTAS ---
 aportacion_primer_ano = ahorro_mensual * 12
 excedente = 0
-mensaje_alerta = ""
 mostrar_alerta = False
+texto_alerta_pdf = ""
 
 if estrategia_fiscal == "Art 151 (PPR - Deducible)":
     if aportacion_primer_ano > tope_deducible_anual:
         mostrar_alerta = True
         excedente = aportacion_primer_ano - tope_deducible_anual
         beneficio_sat_real = tope_deducible_anual * ISR_ESTIMADO
+        texto_alerta_pdf = f"Tu aportación excede el tope deducible. Excedente no deducible: ${excedente:,.2f}"
     else:
         beneficio_sat_real = aportacion_primer_ano * ISR_ESTIMADO
 else:
-    beneficio_sat_real = 0 # Art 93 no deduce
+    beneficio_sat_real = 0 
 
-# --- 4. INTERFAZ PRINCIPAL (MAIN DASHBOARD) ---
+# --- 4. INTERFAZ PRINCIPAL ---
 
 st.title("🛡️ Simulador Krece360")
 st.markdown("Herramienta de proyección financiera realista.")
 
-# --- ALERTA INTELIGENTE (AQUÍ APARECE SI HAY EXCEDENTE) ---
+# Alerta Visual
 if mostrar_alerta:
     st.warning(f"""
     ⚠️ **¡Atención! Tu aportación excede el límite deducible.**
@@ -143,24 +192,31 @@ if mostrar_alerta:
     * Excedente (No deducible): **\${excedente:,.2f}**
     """)
 
-# --- TARJETAS DE MÉTRICAS (KPIs) ---
+# Métricas
 col1, col2, col3 = st.columns(3)
-
 with col1:
     st.metric(label="Total que aportas", value=f"${total_aportado:,.0f}")
-
 with col2:
     st.metric(label="Saldo Final (Libre de comisiones)", value=f"${saldo:,.0f}", delta="Costo Admin incluido")
-
 with col3:
     st.metric(label="Beneficio SAT Estimado (Total)", value=f"${beneficio_sat_real * plazo_anos:,.0f}", delta="Dinero que Hacienda te devuelve")
 
+# --- AQUÍ ESTÁ EL "BROCHE DE ORO" (Mensaje Fiscal) ---
+if estrategia_fiscal == "Art 93 (No Deducible)":
+    st.success(f"""
+    🌟 **Ventaja Fiscal (Art 93):** Aunque no deduces hoy, este plan garantiza que tus **${saldo:,.0f}** serán **Totalmente Libres de Impuestos** al recibirlos a los 60 años o más (según requisitos de permanencia).
+    """)
+    texto_analisis_pdf = "Plan Exento de Impuestos al final (Art 93 LISR). Recibes tu saldo íntegro."
+elif estrategia_fiscal == "Art 151 (PPR - Deducible)":
+    st.info("""
+    ℹ️ **Consideración al Retiro:** Al finalizar el plan (edad 65), el monto acumulado es ingreso acumulable. Existe una exención grande (90 UMAs), pero el excedente podría pagar impuestos.
+    """)
+    texto_analisis_pdf = "Plan Deducible (Art 151 LISR). Genera devoluciones hoy, sujeto a retención al retiro sobre el excedente de 90 UMAs."
+
 st.markdown("---")
 
-# --- GRÁFICA (ALTAIR) ---
+# Gráfica
 st.subheader("Proyección Real (Neto de Comisiones)")
-
-# Transformar datos para Altair (Formato largo)
 df_chart = df[["Año", "Saldo Neto", "Aportado", "Devoluciones SAT"]].melt('Año', var_name='Categoría', value_name='Monto')
 
 chart = alt.Chart(df_chart).mark_line().encode(
@@ -168,14 +224,31 @@ chart = alt.Chart(df_chart).mark_line().encode(
     y='Monto',
     color=alt.Color('Categoría', scale=alt.Scale(domain=['Aportado', 'Saldo Neto', 'Devoluciones SAT'], range=['#ff4b4b', '#1f77b4', '#2ca02c'])),
     tooltip=['Año', 'Categoría', alt.Tooltip('Monto', format='$,.0f')]
-).properties(
-    height=400
-)
+).properties(height=400)
 
 st.altair_chart(chart, use_container_width=True)
 
-# --- NOTA DE TRANSPARENCIA (AZUL AL FINAL) ---
 st.info("""
 ℹ️ **Nota de Transparencia:** A diferencia de otros cotizadores, aquí **YA RESTAMOS** el costo administrativo 
 (aprox 1.70% anual para tu nivel de aportación). Lo que ves en la línea azul es lo que realmente proyectamos que llegue a tu bolsillo.
 """)
+
+# --- 5. SECCIÓN DE DESCARGA PDF ---
+st.markdown("### 📄 Exportar Propuesta")
+
+if st.button("Generar PDF"):
+    pdf_bytes, error = crear_pdf(
+        {'nombre': nombre, 'edad': edad, 'retiro': retiro, 'estrategia': estrategia_fiscal},
+        {'aporte_mensual': ahorro_mensual, 'saldo_final': saldo, 'beneficio_sat': beneficio_sat_real * plazo_anos},
+        {'texto_analisis': texto_analisis_pdf, 'alerta_excedente': texto_alerta_pdf}
+    )
+    
+    if error:
+        st.error(f"Error al generar PDF: {error}")
+    else:
+        st.download_button(
+            label="⬇️ Descargar PDF",
+            data=pdf_bytes,
+            file_name=f"Propuesta_Krece360_{nombre}.pdf",
+            mime="application/pdf"
+        )
