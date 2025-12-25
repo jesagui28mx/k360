@@ -20,9 +20,18 @@ st.markdown("""
 # --- CLASE PARA GENERAR PDF ---
 class PDFReport(FPDF):
     def header(self):
+        # 1. Intentamos poner el logo
+        try:
+            # Busca un archivo llamado 'logo.png' en la misma carpeta
+            self.image('logo.png', 10, 8, 33) 
+        except:
+            pass # Si no hay logo, no pasa nada
+            
         self.set_font('Arial', 'B', 15)
-        self.cell(0, 10, 'Reporte de Proyección Financiera - Krece360', 0, 1, 'C')
-        self.ln(5)
+        # Movemos el título a la derecha para que no choque con el logo
+        self.cell(40) 
+        self.cell(0, 10, 'Reporte de Proyección Financiera - Krece360', 0, 1, 'L')
+        self.ln(10)
 
     def footer(self):
         self.set_y(-15)
@@ -68,8 +77,16 @@ def crear_pdf(datos_cliente, datos_financieros, df_tabla, agente_info):
     pdf.ln(2)
     pdf.multi_cell(0, 8, f"Este cálculo ya contempla el costo administrativo aproximado de Allianz ({datos_financieros['tasa_admin']*100:.2f}% anual) según tu nivel de aportación. Mostramos valores netos para tu seguridad.")
     pdf.ln(5)
+    
+    # Sección 4: Nota Fiscal (Si aplica)
+    if datos_financieros['mensaje_fiscal']:
+         pdf.set_font("Arial", 'I', 10)
+         pdf.set_text_color(148, 49, 38) # Rojo oscuro
+         pdf.multi_cell(0, 6, f"Nota Fiscal: {datos_financieros['mensaje_fiscal']}")
+         pdf.set_text_color(0, 0, 0)
+         pdf.ln(5)
 
-    # Sección 4: Contacto Agente
+    # Sección 5: Contacto Agente
     pdf.ln(10)
     pdf.set_draw_color(46, 134, 193)
     pdf.set_line_width(1)
@@ -80,20 +97,19 @@ def crear_pdf(datos_cliente, datos_financieros, df_tabla, agente_info):
     pdf.set_font("Arial", size=12)
     pdf.cell(0, 8, f"Teléfono / WhatsApp: {agente_info['telefono']}", 0, 1, 'C')
     
-    return pdf.output(dest='S').encode('latin-1')
+    # Usamos 'replace' para evitar errores con acentos raros
+    return pdf.output(dest='S').encode('latin-1', 'replace')
 
 # --- LÓGICA DE COSTOS ALLIANZ (Aproximación basada en PDF) ---
 def obtener_tasa_admin(monto_mensual, plazo):
-    # Lógica simplificada basada en la tabla de la página 9 del PDF
-    # A mayor monto y plazo, menor tasa
     if monto_mensual < 3000:
-        return 0.0228 # 2.28%
+        return 0.0228 
     elif monto_mensual < 6000:
-        return 0.019 # Promedio 1.9%
+        return 0.019 
     elif monto_mensual < 9000:
-        return 0.017 # Promedio 1.7%
+        return 0.017 
     else:
-        return 0.0153 # 1.53% (Mínimo)
+        return 0.0153 
 
 # --- APP STREAMLIT ---
 
@@ -125,12 +141,12 @@ with col_sidebar:
     
     st.markdown("---")
     st.subheader("Datos del Agente")
-    agente_nombre = st.text_input("Nombre Agente", "Araceli Torres Baez") # Default de tu PDF
+    agente_nombre = st.text_input("Nombre Agente", "Araceli Torres Baez") 
     agente_tel = st.text_input("Teléfono", "55 1234 5678")
 
 # --- CÁLCULOS ---
 tasa_admin = obtener_tasa_admin(ahorro, plazo)
-tasa_neta = tasa_bruta - tasa_admin # Restamos lo que cobra Allianz
+tasa_neta = tasa_bruta - tasa_admin 
 
 datos = []
 saldo = 0
@@ -147,7 +163,7 @@ for i in range(1, (plazo * 12) + 1):
     if regimen == "Art 151 (PPR - Deducible)" and i % 12 == 0:
         beneficio_fiscal_acumulado += (aporte_actual * 12) * 0.30
 
-    # Interés compuesto con TASA NETA (Ya quitando cobro Allianz)
+    # Interés compuesto con TASA NETA
     saldo = (saldo + aporte_actual) * (1 + (tasa_neta / 12))
     aportado += aporte_actual
     
@@ -160,13 +176,45 @@ for i in range(1, (plazo * 12) + 1):
         })
 
 df = pd.DataFrame(datos).set_index("Edad")
+saldo_final = df["Saldo Neto"].iloc[-1]
+aportado_final = df["Aportado"].iloc[-1]
+
+# --- LÓGICA FISCAL AVANZADA (NUEVO BLOQUE) ---
+impuesto_estimado = 0
+mensaje_fiscal_alerta = ""
+mensaje_fiscal_pdf = "" # Mensaje corto para el PDF
+color_alerta = "green"
+saldo_final_real = saldo_final
+
+# Tope exento según ley (aprox 90 UMAs anualizadas * 5 o tope global)
+# Usamos el tope global de 3.7M mencionado en tu PDF
+TOPE_EXENTO_PPR = 3714612 
+
+if regimen == "Art 151 (PPR - Deducible)":
+    if saldo_final > TOPE_EXENTO_PPR:
+        monto_gravable = saldo_final - TOPE_EXENTO_PPR
+        impuesto_estimado = monto_gravable * 0.20 # 20% Estimado sobre excedente
+        saldo_final_real = saldo_final - impuesto_estimado
+        mensaje_fiscal_alerta = f"⚠️ Tu ahorro supera el tope exento (${TOPE_EXENTO_PPR:,.0f}). Se estima un impuesto de ${impuesto_estimado:,.0f} sobre el excedente."
+        mensaje_fiscal_pdf = "El saldo supera el tope exento legal. Se aplicará retención ISR sobre el excedente."
+        color_alerta = "orange"
+    else:
+        mensaje_fiscal_alerta = "✅ Tu saldo final está 100% libre de impuestos (Art. 151) al no superar el tope legal."
+        mensaje_fiscal_pdf = ""
+else: # Art 93
+    if retiro < 60:
+        mensaje_fiscal_alerta = "⚠️ Al retirarte antes de los 60 años, el SAT retendrá impuestos sobre tus intereses reales."
+        mensaje_fiscal_pdf = "Retiro anticipado (<60 años) sujeto a retención de ISR sobre intereses reales."
+        color_alerta = "orange"
+    else:
+        mensaje_fiscal_alerta = "✅ Retiro exento de impuestos (Cumpliendo requisitos Art. 93: +60 años y 5 años de vigencia)."
+        mensaje_fiscal_pdf = ""
+
 
 # --- VISUALIZACIÓN PRINCIPAL ---
 with col_main:
     # 1. Tarjetas de Resumen
     c1, c2, c3 = st.columns(3)
-    saldo_final = df["Saldo Neto"].iloc[-1]
-    aportado_final = df["Aportado"].iloc[-1]
     
     with c1:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
@@ -175,40 +223,41 @@ with col_main:
         
     with c2:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Saldo Final (Libre de comisiones)", f"${saldo_final:,.0f}", delta=f"Costo Admin: {tasa_admin*100:.2f}% incluído")
+        st.metric("Saldo Final (Post-Impuestos)", f"${saldo_final_real:,.0f}", delta=f"Costo Admin incluído")
         st.markdown('</div>', unsafe_allow_html=True)
 
     with c3:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
         if regimen == "Art 151 (PPR - Deducible)":
             st.metric("Beneficio SAT Estimado", f"${beneficio_fiscal_acumulado:,.0f}")
-            st.markdown('<span class="deduccion-success">Dinero que Hacienda te devuelve</span>', unsafe_allow_html=True)
+            st.markdown('<span class="deduccion-success">Dinero devuelto por SAT</span>', unsafe_allow_html=True)
         else:
-            st.metric("Beneficio Fiscal", "Exento")
-            st.markdown('<span class="deduccion-success">Todo el saldo final es libre de impuestos (Art 93)</span>', unsafe_allow_html=True)
+            st.metric("Beneficio Fiscal", "Exento Art 93")
+            st.markdown('<span class="deduccion-success">Sin deducción, sin impuestos al final</span>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # Alerta Fiscal
+    if color_alerta == "orange":
+        st.warning(mensaje_fiscal_alerta)
+    else:
+        st.success(mensaje_fiscal_alerta)
+
     # 2. Gráfica
-    st.subheader("Proyección Real (Neto de Comisiones)")
+    st.subheader("Proyección de Patrimonio")
     
     # Preparamos los datos base (2 columnas)
     chart_data = df[["Aportado", "Saldo Neto"]]
-    # Preparamos los colores base (Rojo y Azul)
     colores_grafica = ["#FF4B4B", "#2E86C1"]
     
-    # Si es PPR, agregamos la 3er columna y el 3er color
     if regimen == "Art 151 (PPR - Deducible)":
         chart_data["Devoluciones SAT"] = df["Devoluciones SAT"]
-        colores_grafica.append("#28B463") # Agregamos Verde solo si es necesario
+        colores_grafica.append("#28B463") 
         
-    # Ahora sí, pasamos la lista de colores que coincida exactamente
     st.line_chart(chart_data, color=colores_grafica)
 
     # 3. Explicación de Transparencia
     st.info(f"""
-    ℹ️ **Nota de Transparencia:** A diferencia de otros cotizadores, aquí **YA RESTAMOS** el costo administrativo de Allianz 
-    (aprox {tasa_admin*100:.2f}% anual para tu nivel de aportación). 
-    Lo que ves en la línea azul es lo que realmente proyectamos que llegue a tu bolsillo.
+    ℹ️ **Nota de Transparencia:** Cálculo neto de comisiones administrativas Allianz (aprox {tasa_admin*100:.2f}% anual).
     """)
 
     # --- GENERACIÓN DE PDF ---
@@ -219,9 +268,10 @@ with col_main:
     
     datos_pdf_fin = {
         "aportado": aportado_final,
-        "saldo": saldo_final,
+        "saldo": saldo_final_real, # Usamos el real (quitando impuestos si aplica)
         "beneficio_fiscal": beneficio_fiscal_acumulado if regimen == "Art 151 (PPR - Deducible)" else 0,
-        "tasa_admin": tasa_admin
+        "tasa_admin": tasa_admin,
+        "mensaje_fiscal": mensaje_fiscal_pdf
     }
     
     datos_pdf_cliente = {
@@ -246,4 +296,4 @@ with col_main:
             mime="application/pdf",
         )
     with col_msg:
-        st.write("Entrega este documento a tu cliente. Incluye tus datos de contacto y el desglose transparente.")
+        st.write("Entrega este documento a tu cliente. Incluye desglose fiscal y administrativo.")
