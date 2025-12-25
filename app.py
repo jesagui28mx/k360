@@ -4,6 +4,8 @@ import numpy as np
 import altair as alt
 from fpdf import FPDF
 import base64
+from datetime import datetime
+import os
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Simulador Krece360", layout="wide", page_icon="🛡️")
@@ -24,26 +26,41 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- CLASE PDF (RECUPERADA Y MEJORADA) ---
+# --- CLASE PDF (LOGOTIPO DINÁMICO Y FECHA) ---
 class PDFReport(FPDF):
+    def __init__(self, logo_path=None):
+        super().__init__()
+        self.logo_path = logo_path
+        self.fecha_actual = datetime.now().strftime("%d/%m/%Y")
+
     def header(self):
-        try:
-            self.image('logo.png', 10, 8, 33) 
-        except Exception:
-            pass 
+        # 1. Logotipo (si existe)
+        if self.logo_path and os.path.exists(self.logo_path):
+            try:
+                self.image(self.logo_path, 10, 8, 33) 
+            except Exception:
+                pass 
+        
+        # 2. Título
         self.set_font('Arial', 'B', 15)
-        self.cell(40) 
-        self.cell(0, 10, 'Krece360 - Proyección Financiera', 0, 1, 'L')
-        self.ln(10)
+        self.cell(40) # Espacio para el logo
+        self.cell(0, 10, 'Krece360 - Proyección Financiera', 0, 0, 'L')
+        
+        # 3. Fecha (Esquina derecha)
+        self.set_font('Arial', 'I', 10)
+        self.cell(0, 10, f'Fecha: {self.fecha_actual}', 0, 1, 'R')
+        
+        self.ln(5)
 
     def footer(self):
         self.set_y(-15)
         self.set_font('Arial', 'I', 8)
-        self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
+        self.cell(0, 10, f'Página {self.page_no()} | Generado con Simulador Krece360', 0, 0, 'C')
 
-def crear_pdf(datos_cliente, datos_fin, datos_fiscales):
+def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_temp):
     try:
-        pdf = PDFReport()
+        # Pasamos la ruta del logo al constructor
+        pdf = PDFReport(logo_path=ruta_logo_temp)
         pdf.add_page()
         pdf.set_font("Arial", size=12)
         
@@ -76,6 +93,18 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales):
             pdf.set_text_color(200, 0, 0)
             pdf.multi_cell(0, 8, f"NOTA: {datos_fiscales['alerta_excedente']}")
             pdf.set_text_color(0, 0, 0)
+            
+        # Firma del Asesor
+        pdf.ln(15)
+        pdf.set_draw_color(150, 150, 150)
+        pdf.line(10, pdf.get_y(), 200, pdf.get_y()) 
+        pdf.ln(5)
+        
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(0, 10, "Asesor Certificado:", 0, 1)
+        pdf.set_font("Arial", size=12)
+        pdf.cell(0, 8, f"{datos_asesor['nombre']}", 0, 1)
+        pdf.cell(0, 8, f"Contacto: {datos_asesor['telefono']}", 0, 1)
 
         return pdf.output(dest='S').encode('latin-1', 'replace'), None
     except Exception as e:
@@ -87,7 +116,7 @@ with st.sidebar:
     st.header("⚙️ Parámetros")
     
     st.subheader("Datos del Prospecto")
-    nombre = st.text_input("Nombre Cliente", value="Escribe aquí")
+    nombre = st.text_input("Nombre Cliente", value="Juan Pérez")
     
     st.subheader("Configuración Plan")
     col_edad, col_retiro = st.columns(2)
@@ -113,6 +142,16 @@ with st.sidebar:
     tasa_interes = st.slider("Tasa Mercado Bruta (%)", 5.0, 15.0, 10.0) / 100
     inflacion = st.checkbox("Considerar Inflación (4%)", value=True)
     tasa_inflacion = 0.04 if inflacion else 0.0
+    
+    # --- NUEVA SECCIÓN: PERSONALIZACIÓN (LOGO Y DATOS) ---
+    st.markdown("---")
+    st.subheader("Personalización (PDF)")
+    
+    # Subida de Logo
+    uploaded_logo = st.file_uploader("Cargar Logotipo (Opcional)", type=['png', 'jpg', 'jpeg'])
+    
+    asesor_nombre = st.text_input("Nombre del Asesor", value="Tu Nombre Aquí")
+    asesor_telefono = st.text_input("Teléfono / WhatsApp", value="55-0000-0000")
 
 # --- 2. CÁLCULOS MATEMÁTICOS ---
 
@@ -201,7 +240,7 @@ with col2:
 with col3:
     st.metric(label="Beneficio SAT Estimado (Total)", value=f"${beneficio_sat_real * plazo_anos:,.0f}", delta="Dinero que Hacienda te devuelve")
 
-# --- AQUÍ ESTÁ EL "BROCHE DE ORO" (Mensaje Fiscal) ---
+# Mensaje Fiscal
 if estrategia_fiscal == "Art 93 (No Deducible)":
     st.success(f"""
     🌟 **Ventaja Fiscal (Art 93):** Aunque no deduces hoy, este plan garantiza que tus **${saldo:,.0f}** serán **Totalmente Libres de Impuestos** al recibirlos a los 60 años o más (según requisitos de permanencia).
@@ -237,15 +276,26 @@ st.info("""
 st.markdown("### 📄 Exportar Propuesta")
 
 if st.button("Generar PDF"):
+    # Manejo del Logo Temporal
+    logo_path_temp = None
+    if uploaded_logo is not None:
+        with open("temp_logo_upload.png", "wb") as f:
+            f.write(uploaded_logo.getbuffer())
+        logo_path_temp = "temp_logo_upload.png"
+    
+    # Generar PDF
     pdf_bytes, error = crear_pdf(
         {'nombre': nombre, 'edad': edad, 'retiro': retiro, 'estrategia': estrategia_fiscal},
         {'aporte_mensual': ahorro_mensual, 'saldo_final': saldo, 'beneficio_sat': beneficio_sat_real * plazo_anos},
-        {'texto_analisis': texto_analisis_pdf, 'alerta_excedente': texto_alerta_pdf}
+        {'texto_analisis': texto_analisis_pdf, 'alerta_excedente': texto_alerta_pdf},
+        {'nombre': asesor_nombre, 'telefono': asesor_telefono},
+        logo_path_temp # Enviamos la ruta del logo
     )
     
     if error:
         st.error(f"Error al generar PDF: {error}")
     else:
+        st.success("✅ PDF Generado con éxito")
         st.download_button(
             label="⬇️ Descargar PDF",
             data=pdf_bytes,
