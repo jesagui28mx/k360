@@ -190,11 +190,19 @@ with col_main:
 
     # 2. Gráfica
     st.subheader("Proyección Real (Neto de Comisiones)")
+    
+    # Preparamos los datos base (2 columnas)
     chart_data = df[["Aportado", "Saldo Neto"]]
+    # Preparamos los colores base (Rojo y Azul)
+    colores_grafica = ["#FF4B4B", "#2E86C1"]
+    
+    # Si es PPR, agregamos la 3er columna y el 3er color
     if regimen == "Art 151 (PPR - Deducible)":
         chart_data["Devoluciones SAT"] = df["Devoluciones SAT"]
+        colores_grafica.append("#28B463") # Agregamos Verde solo si es necesario
         
-    st.line_chart(chart_data, color=["#FF4B4B", "#2E86C1", "#28B463"])
+    # Ahora sí, pasamos la lista de colores que coincida exactamente
+    st.line_chart(chart_data, color=colores_grafica)
 
     # 3. Explicación de Transparencia
     st.info(f"""
