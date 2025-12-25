@@ -28,14 +28,14 @@ with st.sidebar:
     st.header("⚙️ Parámetros")
     
     st.subheader("Datos del Prospecto")
-    nombre = st.text_input("Nombre Cliente", value="Juan Perez Test")
+    nombre = st.text_input("Nombre Cliente", value="Escribe aquí")
     
     st.subheader("Configuración Plan")
     col_edad, col_retiro = st.columns(2)
     edad = col_edad.number_input("Edad", value=30, step=1)
     retiro = col_retiro.number_input("Edad Retiro", value=65, step=1)
     
-    ahorro_mensual = st.number_input("Ahorro Mensual", value=8000, step=500)
+    ahorro_mensual = st.number_input("Ahorro Mensual", value=1500, step=500)
     
     st.subheader("Fiscalidad y Rendimiento")
     estrategia_fiscal = st.selectbox("Estrategia Fiscal", ["Art 151 (PPR - Deducible)", "Art 93 (No Deducible)"])
