@@ -244,7 +244,7 @@ else:
 
 # --- 4. INTERFAZ PRINCIPAL ---
 
-st.title("🛡️ Simulador Krece360")
+st.title("🛡️ Simulador PPR")
 st.markdown("Herramienta de proyección financiera realista.")
 
 # Alerta Visual
