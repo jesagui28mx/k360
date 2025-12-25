@@ -61,9 +61,9 @@ class PDFReport(FPDF):
         
         disclaimer = (
             "AVISO LEGAL: Los rendimientos y montos  en este documento son estimativos, una simulación de carácter exclusivamente" 
-            "informativo y no constituye una cotización formal"
-            "ni una oferta vinculante por parte de una compañía de seguros."
-            "Para obtener una cotización oficial y proceder a la contratación, por favor comuníquese con su asesor."
+            " informativa y no constituye una cotización formal"
+            " ni una oferta vinculante por parte de una compañía de seguros."
+            " Para obtener una cotización oficial y proceder a la contratación, por favor comuníquese con su asesor."
         )
         self.multi_cell(0, 3, disclaimer, 0, 'C') # Centrado y con salto de línea automático
 
