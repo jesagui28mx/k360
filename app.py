@@ -136,10 +136,11 @@ if mostrar_alerta:
     st.warning(f"""
     ⚠️ **¡Atención! Tu aportación excede el límite deducible.**
     
-    Estás aportando **${aportacion_primer_ano:,.2f}** anual,  considera que lo deducible es **${tope_deducible_anual:,.2f}**.
+    Estás aportando **\${aportacion_primer_ano:,.2f}** anuales.
+    Toma en consideración que lo deducible es **\${tope_deducible_anual:,.2f}**.
     
-    * Monto que SÍ deduce impuestos: **${tope_deducible_anual:,.2f}**
-    * Excedente (No deducible): **${excedente:,.2f}**
+    * Monto que SÍ deduce impuestos: **\${tope_deducible_anual:,.2f}**
+    * Excedente (No deducible): **\${excedente:,.2f}**
     """)
 
 # --- TARJETAS DE MÉTRICAS (KPIs) ---
