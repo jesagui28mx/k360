@@ -60,8 +60,8 @@ class PDFReport(FPDF):
         self.set_text_color(100, 100, 100) # Color gris para no distraer
         
         disclaimer = (
-            "AVISO LEGAL: Los rendimientos y montos  en este documento son estimativos, una simulación de carácter exclusivamente " 
-            "informativa y no constituye una cotización formal "
+            "AVISO LEGAL: Los rendimientos y montos en este documento son estimativos, de carácter exclusivamente " 
+            "informativos y no constituye una cotización formal "
             "ni una oferta vinculante por parte de una compañía de seguros. "
             "Para obtener una cotización oficial y proceder a la contratación, por favor comuníquese con su asesor."
         )
