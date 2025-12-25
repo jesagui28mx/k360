@@ -44,7 +44,7 @@ class PDFReport(FPDF):
         # 2. Título
         self.set_font('Arial', 'B', 15)
         self.cell(40) # Espacio para el logo
-        self.cell(0, 10, 'Krece360 - Proyección Financiera', 0, 0, 'L')
+        self.cell(0, 10, 'PPR - Proyección Financiera', 0, 0, 'L')
         
         # 3. Fecha (Esquina derecha)
         self.set_font('Arial', 'I', 10)
