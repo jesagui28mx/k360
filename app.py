@@ -8,7 +8,7 @@ from datetime import datetime
 import os
 
 # --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Simulador Krece360", layout="wide", page_icon="🛡️")
+st.set_page_config(page_title="Simulador PPR", layout="wide", page_icon="🛡️")
 
 # --- ESTILOS CSS ---
 st.markdown("""
@@ -60,8 +60,9 @@ class PDFReport(FPDF):
         self.set_text_color(100, 100, 100) # Color gris para no distraer
         
         disclaimer = (
-            "AVISO LEGAL: Este documento es una simulación de carácter exclusivamente informativo y no constituye una cotización formal "
-            "ni una oferta vinculante por parte de una compañía de seguros. Los rendimientos y montos son estimados. "
+            "AVISO LEGAL: Los rendimientos y montos son estimadosen este documento es una simulación de carácter exclusivamente" 
+            "informativo y no constituye una cotización formal"
+            "ni una oferta vinculante por parte de una compañía de seguros."
             "Para obtener una cotización oficial y proceder a la contratación, por favor comuníquese con su asesor certificado."
         )
         self.multi_cell(0, 3, disclaimer, 0, 'C') # Centrado y con salto de línea automático
