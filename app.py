@@ -6,6 +6,11 @@ from fpdf import FPDF
 import base64
 from datetime import datetime
 import os
+import io
+import tempfile
+import imghdr
+import re
+import unicodedata
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Simulador Krece360", layout="wide", page_icon="🛡️")
@@ -55,6 +60,7 @@ def obtener_tasa_admin(aporte_mensual, plazo_anios):
     return tasa_final
 
 # --- CLASE PDF MODIFICADA (HEADER/FOOTER) ---
+# --- CLASE PDF MODIFICADA (HEADER/FOOTER) ---
 class PDFReport(FPDF):
     def __init__(self, logo_path=None):
         super().__init__()
@@ -62,41 +68,75 @@ class PDFReport(FPDF):
         self.fecha_actual = datetime.now().strftime("%d/%m/%Y")
 
     def header(self):
-        # 1. Logotipo
+        # 1) Logotipo (opcional)
         if self.logo_path and os.path.exists(self.logo_path):
             try:
-                self.image(self.logo_path, 10, 8, 33) 
+                self.image(self.logo_path, 10, 8, 18)  # x, y, width
             except Exception:
-                pass 
-        
-        # 2. Título
-        self.set_font('Arial', 'B', 15)
-        self.cell(40)
-        self.cell(0, 10, 'Propuesta Personal de Retiro (PPR) — Simulación estimada', 0, 0, 'L')
-        
-        # 3. Fecha
-        self.set_font('Arial', 'I', 10)
-        self.cell(0, 10, f'Fecha: {self.fecha_actual}', 0, 1, 'R')
-        self.ln(5)
+                pass
+
+        # 2) Título
+        self.set_font("Arial", "B", 15)
+        self.cell(30)  # margen por logo
+        self.cell(0, 10, "Propuesta Personal de Retiro (PPR) — Simulación estimada", 0, 0, "L")
+
+        # 3) Fecha
+        self.set_font("Arial", "I", 10)
+        self.cell(0, 10, f"Fecha: {self.fecha_actual}", 0, 1, "R")
+        self.ln(6)
 
     def footer(self):
-        # --- NUEVO DISCLAIMER (Petición Usuario) ---
+        # Aviso legal (pie de página)
         self.set_y(-32)
-        self.set_font('Arial', '', 7)
+        self.set_font("Arial", "", 7)
         self.set_text_color(100, 100, 100)
-        
+
         disclaimer = (
             "Aviso legal: La presente proyección es únicamente informativa y estimativa. "
             "No constituye una cotización formal ni una oferta vinculante por parte de ninguna institución financiera o aseguradora. "
-            "Los rendimientos no están garantizados y pueden variar. Para obtener una cotización oficial y proceder a la contratación, consulte a su asesor."
+            "Los rendimientos no están garantizados y pueden variar. "
+            "Para obtener una cotización oficial y proceder a la contratación, consulte a su asesor."
         )
-        self.multi_cell(0, 3, disclaimer, 0, 'C')
-        
+        self.multi_cell(0, 3, disclaimer, 0, "C")
+
         # Paginación
         self.set_y(-15)
         self.set_text_color(0, 0, 0)
-        self.set_font('Arial', 'I', 8)
-        self.cell(0, 10, f'Página {self.page_no()} | Generado con Simulador Krece360', 0, 0, 'C')
+        self.set_font("Arial", "I", 8)
+        self.cell(0, 10, f"Página {self.page_no()} | Generado con Simulador Krece360", 0, 0, "C")
+
+
+# --- Helpers de endurecimiento (uploads / archivos) ---
+def _safe_filename(text: str, default: str = "propuesta") -> str:
+    try:
+        text = unicodedata.normalize("NFKD", str(text)).encode("ascii", "ignore").decode("ascii")
+    except Exception:
+        text = str(text)
+    text = re.sub(r"[^a-zA-Z0-9_-]+", "_", text).strip("_")
+    return text or default
+
+def _save_logo_to_temp(uploaded_file) -> str | None:
+    """Guarda el logo subido en un archivo temporal seguro y devuelve la ruta."""
+    if uploaded_file is None:
+        return None
+    # Límite (evita uploads gigantes)
+    MAX_BYTES = 2 * 1024 * 1024  # 2MB
+    data = uploaded_file.getvalue()
+    if data is None:
+        return None
+    if len(data) > MAX_BYTES:
+        raise ValueError("El logotipo excede 2MB. Sube una imagen más ligera.")
+    # Validar tipo real de imagen (no solo extensión)
+    kind = imghdr.what(None, h=data)
+    if kind not in {"png", "jpeg"}:
+        raise ValueError("Formato de logotipo no soportado. Usa PNG o JPG/JPEG.")
+    suffix = ".png" if kind == "png" else ".jpg"
+    fd, path = tempfile.mkstemp(prefix="k360_logo_", suffix=suffix)
+    os.close(fd)
+    with open(path, "wb") as f:
+        f.write(data)
+    return path
+
 
 def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_temp):
     try:
@@ -244,7 +284,16 @@ ISR_ESTIMADO = 0.30
 
 # --- APLICACIÓN DE TASA REAL (ALLIANZ) ---
 tasa_admin_real = obtener_tasa_admin(ahorro_mensual, plazo_anos)
-tasa_interes_neta = tasa_bruta - tasa_admin_real # Restamos el costo administrativo a la tasa bruta
+tasa_interes_neta = tasa_bruta - tasa_admin_real  # Restamos el costo administrativo a la tasa bruta
+
+# Hardening: evita tasa neta negativa (puede ocurrir con aportaciones bajas / plazos cortos)
+if tasa_interes_neta < 0:
+    st.warning(
+        f"⚠️ La tasa neta resultó negativa (bruta {tasa_bruta*100:.2f}% - admin {tasa_admin_real*100:.2f}%). "
+        "Se ajustó a 0.00% para evitar proyecciones irreales."
+    )
+    tasa_interes_neta = 0.0
+
 
 meses = plazo_anos * 12
 data = []
@@ -377,26 +426,34 @@ st.markdown("### 📄 Exportar Propuesta")
 
 if st.button("Generar PDF"):
     logo_path_temp = None
-    if uploaded_logo is not None:
-        with open("temp_logo_upload.png", "wb") as f:
-            f.write(uploaded_logo.getbuffer())
-        logo_path_temp = "temp_logo_upload.png"
-    
+    try:
+        logo_path_temp = _save_logo_to_temp(uploaded_logo)
+    except Exception as e:
+        st.error(f"⚠️ No se pudo cargar el logotipo: {e}")
+        logo_path_temp = None
     # Generar PDF
     # CORRECCIÓN: Pasamos 'acumulado_devoluciones' DIRECTO, sin multiplicar por años otra vez.
-    pdf_bytes, error = crear_pdf(
-        {'nombre': nombre, 'edad': edad, 'retiro': retiro, 'estrategia': estrategia_fiscal},
-        {
-            'aporte_mensual': ahorro_mensual, 
-            'saldo_final': saldo, 
-            'beneficio_sat': acumulado_devoluciones, # <--- DATO CORREGIDO
-            'tasa_admin_pct': tasa_admin_real * 100,
-            'total_aportado': total_aportado
-        },
-        {'texto_analisis': texto_analisis_pdf, 'alerta_excedente': texto_alerta_pdf},
-        {'nombre': asesor_nombre, 'telefono': asesor_telefono},
-        logo_path_temp 
-    )
+    try:
+        pdf_bytes, error = crear_pdf(
+            {'nombre': nombre, 'edad': edad, 'retiro': edad_retiro, 'estrategia': estrategia_fiscal},
+            {
+                'aporte_mensual': ahorro_mensual,
+                'saldo_final': saldo,
+                'beneficio_sat': acumulado_devoluciones,
+                'tasa_admin_pct': tasa_admin_real * 100,
+                'total_aportado': total_aportado
+            },
+            {'texto_analisis': texto_analisis_pdf, 'alerta_excedente': texto_alerta_pdf},
+            {'nombre': asesor_nombre, 'telefono': asesor_telefono},
+            logo_path_temp
+        )
+    finally:
+        # Limpieza del archivo temporal del logo (si existe)
+        if logo_path_temp and os.path.exists(logo_path_temp):
+            try:
+                os.remove(logo_path_temp)
+            except Exception:
+                pass
     
     if error:
         st.error(f"Error al generar PDF: {error}")
@@ -405,6 +462,6 @@ if st.button("Generar PDF"):
         st.download_button(
             label="⬇️ Descargar PDF",
             data=pdf_bytes,
-            file_name=f"Propuesta_Krece360_{nombre}.pdf",
+            file_name=f"Propuesta_Krece360_{_safe_filename(nombre)}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
             mime="application/pdf"
         )
