@@ -72,7 +72,7 @@ class PDFReport(FPDF):
         # 2. Título
         self.set_font('Arial', 'B', 15)
         self.cell(40)
-        self.cell(0, 10, 'Krece360 - Proyección Financiera', 0, 0, 'L')
+        self.cell(0, 10, 'Propuesta Personal de Retiro (PPR) — Simulación estimada', 0, 0, 'L')
         
         # 3. Fecha
         self.set_font('Arial', 'I', 10)
@@ -86,9 +86,9 @@ class PDFReport(FPDF):
         self.set_text_color(100, 100, 100)
         
         disclaimer = (
-            "AVISO LEGAL: Esta proyección es de carácter exclusivamente informativo y representa una simulación basada en los datos proporcionados. "
-            "No constituye una oferta formal, contrato vinculante ni garantía de rendimientos futuros. La tasa administrativa aplicada corresponde "
-            "a la matriz oficial del producto. Para una cotización formal, contacte a su asesor."
+            "Aviso legal: La presente proyección es únicamente informativa y estimativa. "
+            "No constituye una cotización formal ni una oferta vinculante por parte de ninguna institución financiera o aseguradora. "
+            "Los rendimientos no están garantizados y pueden variar. Para obtener una cotización oficial y proceder a la contratación, consulte a su asesor."
         )
         self.multi_cell(0, 3, disclaimer, 0, 'C')
         
@@ -115,7 +115,20 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         pdf.cell(0, 10, f"Edad Actual: {datos_cliente['edad']} | Edad Retiro: {datos_cliente['retiro']}", 0, 1)
         pdf.cell(0, 10, f"Estrategia: {datos_cliente['estrategia']}", 0, 1)
         pdf.ln(5)
-        
+
+        # Resumen de la estrategia
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(0, 8, "Resumen de la estrategia", 0, 1)
+        pdf.set_font("Arial", size=10)
+        resumen = (
+            "Con base en la información proporcionada, esta simulación presenta una proyección estimada "
+            "de ahorro para el retiro mediante un Plan Personal de Retiro (PPR), considerando aportaciones "
+            "periódicas, un horizonte de largo plazo y el tratamiento fiscal conforme a la legislación vigente. "
+            "Los resultados son estimativos y no representan una garantía de rendimiento futuro."
+        )
+        pdf.multi_cell(0, 5, resumen)
+        pdf.ln(2)
+
         # Resumen Financiero
         pdf.set_fill_color(240, 242, 246)
         y_actual = pdf.get_y()
@@ -124,6 +137,7 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         pdf.set_y(y_actual + 5)
         pdf.set_font("Arial", 'B', 12)
         pdf.cell(0, 10, f"   Aportación Mensual: ${datos_fin['aporte_mensual']:,.2f}", 0, 1)
+        pdf.cell(0, 10, f"   Total aportado estimado: ${datos_fin['total_aportado']:,.2f}", 0, 1)
         pdf.cell(0, 10, f"   Saldo Estimado al Retiro: ${datos_fin['saldo_final']:,.2f}", 0, 1)
         pdf.cell(0, 10, f"   Beneficio SAT Estimado: ${datos_fin['beneficio_sat']:,.2f}", 0, 1) # Aquí va el dato corregido
         pdf.set_font("Arial", 'I', 10)
@@ -133,7 +147,7 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         
         # Análisis Fiscal
         pdf.set_font("Arial", 'B', 12)
-        pdf.cell(0, 10, "Análisis Fiscal:", 0, 1)
+        pdf.cell(0, 10, "Análisis fiscal simplificado:", 0, 1)
         pdf.set_font("Arial", size=11)
         pdf.multi_cell(0, 8, datos_fiscales['texto_analisis'])
         
@@ -143,6 +157,19 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
             pdf.multi_cell(0, 8, f"NOTA IMPORTANTE: {datos_fiscales['alerta_excedente']}")
             pdf.set_text_color(0, 0, 0)
             
+
+        # Siguiente paso recomendado
+        pdf.ln(6)
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(0, 8, "Siguiente paso recomendado", 0, 1)
+        pdf.set_font("Arial", size=10)
+        pdf.multi_cell(
+            0, 5,
+            "Revisa esta proyección junto con tu asesor para validar si esta estrategia se ajusta a tus objetivos "
+            "financieros, capacidad de ahorro y horizonte de inversión, y definir el siguiente paso hacia una "
+            "cotización oficial y proceso de contratación."
+        )
+
         # Firma Asesor
         pdf.ln(15)
         pdf.set_draw_color(150, 150, 150)
@@ -195,7 +222,7 @@ with st.sidebar:
             sueldo_anual = st.number_input("Sueldo Bruto Anual", value=600000.0, step=10000.0)
             st.caption(f"Tope 10% ingresos: ${sueldo_anual*0.10:,.0f}")
         else:
-            st.caption("Se usará tope estándar de 5 UMAs.")
+            st.caption(f"Se usará tope anual absoluto Art. 151: ${TOPE_ART_151_ABS:,.0f} (estimado).")
 
     tasa_bruta = st.slider("Tasa Mercado Bruta (%)", 5.0, 15.0, 10.0) / 100
     inflacion = st.checkbox("Considerar Inflación (4%)", value=True)
@@ -210,8 +237,9 @@ with st.sidebar:
 # --- 2. CÁLCULOS MATEMÁTICOS ---
 
 UMA_ANUAL = 39606.36
-TOPE_5_UMAS = UMA_ANUAL * 5 
-TOPE_ART_185 = 152000.0 # Dato fijo de Ley
+TOPE_5_UMAS = UMA_ANUAL * 5  # referencia (UMAs)
+TOPE_ART_151_ABS = 206367.0  # Tope anual absoluto (Art. 151) según material del producto
+TOPE_ART_185 = 152000.0  # Tope anual (Art. 185) según material del producto
 ISR_ESTIMADO = 0.30 
 
 # --- APLICACIÓN DE TASA REAL (ALLIANZ) ---
@@ -230,9 +258,9 @@ acumulado_devoluciones = 0
 tope_deducible_anual = 0
 
 if estrategia_fiscal == "Art 151 (PPR - Deducible)":
-    tope_deducible_anual = TOPE_5_UMAS
+    tope_deducible_anual = TOPE_ART_151_ABS
     if validar_sueldo:
-        tope_deducible_anual = min(TOPE_5_UMAS, sueldo_anual * 0.10)
+        tope_deducible_anual = min(TOPE_ART_151_ABS, sueldo_anual * 0.10)
 elif estrategia_fiscal == "Art 185 (Diferimiento)":
     tope_deducible_anual = TOPE_ART_185
 else:
@@ -279,21 +307,21 @@ texto_analisis_pdf = ""
 
 # Lógica específica por artículo
 if estrategia_fiscal == "Art 151 (PPR - Deducible)":
-    texto_analisis_pdf = "Plan Deducible (Art 151 LISR). Genera devoluciones hoy, sujeto a retención al retiro sobre el excedente de 90 UMAs."
+    texto_analisis_pdf = "Plan Deducible (Art. 151 LISR). Permite deducir aportaciones anuales dentro de los límites establecidos por la ley (10% de ingresos anuales hasta un tope absoluto). La deducción aplica en la declaración anual. Al momento del retiro, el monto acumulado puede considerarse ingreso acumulable; existen exenciones conforme a UMAs vigentes y el excedente podría pagar impuestos. Fecha objetivo para considerar deducibilidad del año: 31 de diciembre (según material del producto)."
     if aportacion_primer_ano > tope_deducible_anual:
         mostrar_alerta = True
         excedente = aportacion_primer_ano - tope_deducible_anual
-        texto_alerta_pdf = f"Tu aportación anual (${aportacion_primer_ano:,.2f}) excede el tope deducible (${tope_deducible_anual:,.2f}). El excedente no es deducible."
+        texto_alerta_pdf = f"Tu aportación anual (${aportacion_primer_ano:,.2f}) excede el tope deducible estimado (${tope_deducible_anual:,.2f}). El excedente no es deducible."
 
 elif estrategia_fiscal == "Art 185 (Diferimiento)":
-    texto_analisis_pdf = "Plan Art 185 LISR. Deducible hasta $152,000. Al retiro se retiene el ISR correspondiente al 100% del saldo (Diferimiento fiscal)."
+    texto_analisis_pdf = "Plan con Diferimiento (Art. 185 LISR). Permite deducir aportaciones hasta el tope anual indicado en el material del producto. Al retiro o disposición, podría aplicar la tasa de ISR correspondiente sobre el saldo según reglas vigentes (diferimiento fiscal). Fecha objetivo de referencia: 30 de abril (según material del producto)."
     if aportacion_primer_ano > TOPE_ART_185:
         mostrar_alerta = True
         excedente = aportacion_primer_ano - TOPE_ART_185
         texto_alerta_pdf = f"Tu aportación supera el tope fijo de $152,000 del Art 185."
 
 elif estrategia_fiscal == "Art 93 (No Deducible)":
-    texto_analisis_pdf = "Plan Exento (Art 93 LISR). No deducible hoy. Al cumplir requisitos (60 años + 5 vigencia), el rendimiento es EXENTO de impuestos."
+    texto_analisis_pdf = "Plan No Deducible (Art. 93 LISR). No genera deducción durante la etapa de ahorro. Al cumplir con requisitos legales aplicables, el saldo podría recibirse de forma exenta."
 
 
 # --- 4. INTERFAZ PRINCIPAL ---
@@ -359,7 +387,8 @@ if st.button("Generar PDF"):
             'aporte_mensual': ahorro_mensual, 
             'saldo_final': saldo, 
             'beneficio_sat': acumulado_devoluciones, # <--- DATO CORREGIDO
-            'tasa_admin_pct': tasa_admin_real * 100
+            'tasa_admin_pct': tasa_admin_real * 100,
+            'total_aportado': total_aportado
         },
         {'texto_analisis': texto_analisis_pdf, 'alerta_excedente': texto_alerta_pdf},
         {'nombre': asesor_nombre, 'telefono': asesor_telefono},
