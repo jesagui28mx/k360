@@ -311,14 +311,17 @@ if estrategia_fiscal == "Art 151 (PPR - Deducible)":
     if aportacion_primer_ano > tope_deducible_anual:
         mostrar_alerta = True
         excedente = aportacion_primer_ano - tope_deducible_anual
-        texto_alerta_pdf = f"Tu aportación anual (${aportacion_primer_ano:,.2f}) excede el tope deducible estimado (${tope_deducible_anual:,.2f}). El excedente no es deducible."
+        texto_alerta_pdf = (
+            f"Tu aportación anual ({aportacion_primer_ano:,.2f} MXN) excede el tope deducible estimado "
+            f"({tope_deducible_anual:,.2f} MXN). El excedente no es deducible."
+        )
 
 elif estrategia_fiscal == "Art 185 (Diferimiento)":
     texto_analisis_pdf = "Plan con Diferimiento (Art. 185 LISR). Permite deducir aportaciones hasta el tope anual indicado en el material del producto. Al retiro o disposición, podría aplicar la tasa de ISR correspondiente sobre el saldo según reglas vigentes (diferimiento fiscal). Fecha objetivo de referencia: 30 de abril (según material del producto)."
     if aportacion_primer_ano > TOPE_ART_185:
         mostrar_alerta = True
         excedente = aportacion_primer_ano - TOPE_ART_185
-        texto_alerta_pdf = f"Tu aportación supera el tope fijo de $152,000 del Art 185."
+        texto_alerta_pdf = "Tu aportación anual excede el tope estimado del Artículo 185."
 
 elif estrategia_fiscal == "Art 93 (No Deducible)":
     texto_analisis_pdf = "Plan No Deducible (Art. 93 LISR). No genera deducción durante la etapa de ahorro. Al cumplir con requisitos legales aplicables, el saldo podría recibirse de forma exenta."
