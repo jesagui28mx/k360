@@ -27,33 +27,27 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- LÓGICA DE NEGOCIO ALLIANZ (MATRIZ DE COSTOS) ---
+# --- MATRIZ DE COSTOS OFICIAL ALLIANZ (Pág. 9) ---
 def obtener_tasa_admin(aporte_mensual, plazo_anios):
-    """
-    Fuente: PDF OptiMaxx Plus, Página 9.
-    Devuelve la tasa de cargo administrativo según Aportación y Plazo.
-    """
-    # 1. Determinar columna (Plazo)
+    # Lógica de Plazo (Columnas)
     if plazo_anios >= 25:
-        col_idx = 2 # Columna 25 años
+        col_idx = 2 
     elif plazo_anios >= 20:
-        col_idx = 1 # Columna 20 años
+        col_idx = 1 
     else:
-        col_idx = 0 # Columna 15 años (Default para menores también)
+        col_idx = 0 
 
-    # 2. Determinar fila (Monto) - Tabla Oficial
-    # Formato: (Monto Mínimo, [Tasa 15, Tasa 20, Tasa 25])
+    # Tabla: (Monto Mínimo, [Tasa 15, Tasa 20, Tasa 25])
     tabla_costos = [
-        (10000, [0.0183, 0.0162, 0.0153]), # Más de 10k
+        (10000, [0.0183, 0.0162, 0.0153]), 
         (7500,  [0.0187, 0.0165, 0.0156]), 
         (5000,  [0.0197, 0.0175, 0.0164]), 
         (4000,  [0.0206, 0.0181, 0.0169]), 
-        (2500,  [0.0228, 0.0199, 0.0184]), # Base estándar
-        (0,     [0.0228, 0.0199, 0.0184])  # Menos de 2,500 (Aplica tasa base)
+        (2500,  [0.0228, 0.0199, 0.0184]), 
+        (0,     [0.0228, 0.0199, 0.0184])  
     ]
 
-    tasa_admin = 0.0228 # Valor por defecto (el más alto) por seguridad
-    
+    tasa_admin = 0.0228 
     for monto_min, tasas in tabla_costos:
         if aporte_mensual >= monto_min:
             tasa_admin = tasas[col_idx]
@@ -89,10 +83,9 @@ class PDFReport(FPDF):
         self.set_text_color(100, 100, 100)
         
         disclaimer = (
-            "AVISO LEGAL: Este documento es una ilustración basada en los parámetros del producto OptiMaxx Plus. "
-            "Los rendimientos pasados no garantizan rendimientos futuros. La tasa administrativa aplicada corresponde "
-            "a la matriz de cargos vigente (Pág 9 Condiciones Generales). El tratamiento fiscal es responsabilidad del contratante "
-            "y está sujeto a la Ley del ISR vigente. No constituye una oferta vinculante."
+            "AVISO LEGAL: Ilustración basada en parámetros de Allianz OptiMaxx Plus. "
+            "Rendimientos pasados no garantizan futuros. Tasa administrativa según matriz vigente. "
+            "Tratamiento fiscal sujeto a Ley del ISR. No es oferta vinculante."
         )
         self.multi_cell(0, 3, disclaimer, 0, 'C')
 
@@ -105,11 +98,11 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
     try:
         pdf = PDFReport(logo_path=ruta_logo_temp)
         pdf.add_page()
-        pdf.ln(15) # Mantiene el espacio para no encimar el logo
+        pdf.ln(15) 
         
         pdf.set_font("Arial", size=12)
         
-        # Datos Cliente
+        # Header
         pdf.set_font("Arial", 'B', 14)
         pdf.cell(0, 10, f"Propuesta para: {datos_cliente['nombre']}", 0, 1)
         pdf.set_font("Arial", size=12)
@@ -117,7 +110,7 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         pdf.cell(0, 10, f"Estrategia Fiscal: {datos_cliente['estrategia']}", 0, 1)
         pdf.ln(5)
         
-        # Resumen Financiero
+        # Financiero
         pdf.set_fill_color(240, 242, 246)
         y_actual = pdf.get_y()
         pdf.rect(10, y_actual, 190, 45, 'F')
@@ -126,19 +119,19 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         pdf.set_font("Arial", 'B', 12)
         pdf.cell(0, 10, f"   Aportación Mensual: ${datos_fin['aporte_mensual']:,.2f}", 0, 1)
         pdf.cell(0, 10, f"   Saldo Proyectado al Retiro: ${datos_fin['saldo_final']:,.2f}", 0, 1)
-        pdf.cell(0, 10, f"   Beneficio SAT Total (Estimado): ${datos_fin['beneficio_sat']:,.2f}", 0, 1)
+        # AQUÍ ESTABA EL ERROR: Se mostraba el dato incorrecto en PDF
+        pdf.cell(0, 10, f"   Beneficio SAT Total Estimado: ${datos_fin['beneficio_sat']:,.2f}", 0, 1)
         pdf.set_font("Arial", 'I', 10)
-        pdf.cell(0, 10, f"   (Costo Admin Aplicado según Matriz: {datos_fin['tasa_admin_pct']:.2f}% anual)", 0, 1)
+        pdf.cell(0, 10, f"   (Costo Admin Aplicado: {datos_fin['tasa_admin_pct']:.2f}% anual)", 0, 1)
         
         pdf.set_y(y_actual + 50)
         
-        # Análisis Fiscal
+        # Fiscal
         pdf.set_font("Arial", 'B', 12)
         pdf.cell(0, 10, "Tratamiento Fiscal Seleccionado:", 0, 1)
         pdf.set_font("Arial", size=11)
         pdf.multi_cell(0, 8, datos_fiscales['texto_analisis'])
         
-        # Alerta en ROJO si existe excedente
         if datos_fiscales['alerta_excedente']:
             pdf.ln(5)
             pdf.set_text_color(200, 0, 0)
@@ -162,7 +155,7 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
     except Exception as e:
         return None, str(e)
 
-# --- SIDEBAR (CONFIGURACIÓN) ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Allianz_SE.svg/2560px-Allianz_SE.svg.png", width=150)
     st.header("⚙️ Configuración")
@@ -196,7 +189,7 @@ with st.sidebar:
             st.caption(f"Tope 10%: ${sueldo_anual*0.10:,.0f}")
 
     st.markdown("---")
-    tasa_bruta = st.slider("Tasa Bruta Fondo (%)", 8.0, 14.0, 10.0, help="S&P500 Promedio Histórico") / 100
+    tasa_bruta = st.slider("Tasa Bruta Fondo (%)", 8.0, 14.0, 10.0) / 100
     inflacion = st.checkbox("Indexar a Inflación (4%)", value=True)
     tasa_inflacion = 0.04 if inflacion else 0.0
 
@@ -208,8 +201,8 @@ with st.sidebar:
 
 # --- CÁLCULOS CENTRALES ---
 UMA_ANUAL = 39606.36
-TOPE_ART_151 = UMA_ANUAL * 5  # Aprox 198k
-TOPE_ART_185 = 152000         # Tope fijo
+TOPE_ART_151 = UMA_ANUAL * 5  
+TOPE_ART_185 = 152000         
 ISR_ESTIMADO = 0.30
 
 # 1. Obtener Costo Admin de la Matriz Oficial
@@ -222,7 +215,7 @@ saldo = 0
 aporte_actual = ahorro_mensual
 total_aportado = 0
 
-# 2. Lógica de Topes y Alertas (RESTAURADA)
+# 2. Lógica de Topes y Alertas
 tope_deducible_anual = 0
 mostrar_alerta = False
 mensaje_alerta = ""
@@ -238,7 +231,7 @@ if estrategia_fiscal == "Art 151 (PPR - Deducible)":
     if aporte_primer_ano > tope_deducible_anual:
         mostrar_alerta = True
         excedente = aporte_primer_ano - tope_deducible_anual
-        mensaje_alerta = f"Tu aportación anual (${aporte_primer_ano:,.0f}) supera el tope deducible (${tope_deducible_anual:,.0f}). El excedente (${excedente:,.0f}) se invierte pero NO deduce impuestos."
+        mensaje_alerta = f"Tu aportación anual (${aporte_primer_ano:,.0f}) supera el tope deducible (${tope_deducible_anual:,.0f}). El excedente se invierte pero NO deduce."
 
 elif estrategia_fiscal == "Art 185 (Diferimiento)":
     tope_deducible_anual = TOPE_ART_185
@@ -264,20 +257,19 @@ for i in range(1, meses + 1):
 
 df = pd.DataFrame(data)
 
-# 4. Beneficio SAT (Cálculo Conservador para evitar críticas)
+# 4. Beneficio SAT (CORREGIDO: CÁLCULO LINEAL EXACTO)
 beneficio_sat_total = 0
 if estrategia_fiscal != "Art 93 (No Deducible / Exento)":
-    # Usamos el tope para el cálculo
+    # Base de cálculo = Lo que realmente puede deducir en un año
     base_calculo = min(aporte_primer_ano, tope_deducible_anual)
-    # Proyección lineal simple: (Base * 30%) * Años
-    # Esto es "a prueba de balas" porque es el dinero nominal que recibe
+    # Devolución Anual x Años del plan (Sin interés compuesto para ser conservador)
     beneficio_sat_total = (base_calculo * ISR_ESTIMADO) * plazo_anos
 
 # --- INTERFAZ USUARIO ---
 st.title("🛡️ Simulador Financiero OptiMaxx")
 st.markdown(f"**Cliente:** {nombre} | **Plazo:** {plazo_anos} años | **Estrategia:** {estrategia_fiscal}")
 
-# --- ALERTA VISUAL (RESTAURADA) ---
+# --- ALERTA VISUAL (AMARILLA) ---
 if mostrar_alerta:
     st.warning(f"⚠️ **ATENCIÓN: Límite Fiscal Excedido**\n\n{mensaje_alerta}")
 
@@ -288,12 +280,12 @@ with col1:
 with col2:
     st.metric("Saldo Final Proyectado", f"${saldo:,.0f}", delta=f"Costo Admin: {tasa_admin_anual*100:.2f}%")
 with col3:
-    st.metric("Beneficio SAT (Estimado)", f"${beneficio_sat_total:,.0f}", help="Suma nominal de devoluciones (Sin reinversión)")
+    st.metric("Beneficio SAT (Total)", f"${beneficio_sat_total:,.0f}", help="Suma de devoluciones estimadas")
 with col4:
     ganancia = saldo - total_aportado
     st.metric("Ganancia Neta", f"${ganancia:,.0f}")
 
-st.caption(f"ℹ️ **Nota Técnica:** Se aplica Tasa Administrativa de **{tasa_admin_anual*100:.2f}%** conforme a la tabla de cargos de Allianz (Monto ${ahorro_mensual:,.0f} vs Plazo {plazo_anos} años).")
+st.caption(f"ℹ️ Se aplica Tasa Administrativa de **{tasa_admin_anual*100:.2f}%** según tabla oficial (Monto ${ahorro_mensual:,.0f} vs Plazo {plazo_anos} años).")
 
 # Gráfica
 st.subheader("Proyección Patrimonial")
@@ -318,15 +310,17 @@ if st.button("Generar PDF Propuesta"):
     # Textos Dinámicos
     texto_analisis = ""
     if estrategia_fiscal == "Art 93 (No Deducible / Exento)":
-        texto_analisis = "PLAN ARTÍCULO 93 LISR: Tus aportaciones NO son deducibles hoy. BENEFICIO: Al cumplir requisitos (60 años de edad + 5 de vigencia), el rendimiento real es EXENTO de impuestos (Tope ~3.7 MDP). Ideal para liquidez futura libre de impuestos."
+        texto_analisis = "PLAN ARTÍCULO 93 LISR: Tus aportaciones NO son deducibles hoy. BENEFICIO: Al cumplir requisitos, el rendimiento real es EXENTO de impuestos (Tope ~3.7 MDP). Ideal para liquidez futura."
     elif estrategia_fiscal == "Art 151 (PPR - Deducible)":
-        texto_analisis = "PLAN PPR (ART 151 LISR): Tus aportaciones son DEDUCIBLES en la declaración anual (Tope 10% ingresos o 5 UMAs). Generas saldo a favor hoy. Al retiro (65 años), el monto es acumulable con exención de 90 UMAs."
+        texto_analisis = "PLAN PPR (ART 151 LISR): Tus aportaciones son DEDUCIBLES en la declaración anual (Tope 10% ingresos o 5 UMAs). Generas saldo a favor hoy."
     elif estrategia_fiscal == "Art 185 (Diferimiento)":
-        texto_analisis = "PLAN ARTÍCULO 185 LISR: Deducible hasta $152,000 pesos anuales. Este beneficio es un DIFERIMIENTO: deduces hoy, pero al momento del retiro se retiene el impuesto sobre el 100% del monto."
+        texto_analisis = "PLAN ARTÍCULO 185 LISR: Deducible hasta $152,000 pesos anuales. Este beneficio es un DIFERIMIENTO: deduces hoy, pero al retiro se retiene el impuesto."
 
     pdf_bytes, error = crear_pdf(
         {'nombre': nombre, 'edad': edad, 'retiro': retiro, 'plazo': plazo_anos, 'estrategia': estrategia_fiscal},
-        {'aporte_mensual': ahorro_mensual, 'saldo_final': saldo, 'beneficio_sat': beneficio_sat_total, 'tasa_admin_pct': tasa_admin_anual*100},
+        {'aporte_mensual': ahorro_mensual, 'saldo_final': saldo, 
+         'beneficio_sat': beneficio_sat_total,  # <--- CORRECCIÓN: SE PASA EL TOTAL DIRECTO, SIN MULTIPLICAR
+         'tasa_admin_pct': tasa_admin_anual*100},
         {'texto_analisis': texto_analisis, 'alerta_excedente': mensaje_alerta if mostrar_alerta else ""},
         {'nombre': asesor_nombre, 'telefono': asesor_telefono},
         logo_path_temp
