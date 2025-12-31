@@ -8,7 +8,7 @@ from datetime import datetime
 import os
 import io
 import tempfile
-import imghdr
+from PIL import Image
 import re
 import unicodedata
 
@@ -133,10 +133,15 @@ def _save_logo_to_temp(uploaded_file) -> str | None:
     if len(data) > MAX_BYTES:
         raise ValueError("El logotipo excede 2MB. Sube una imagen más ligera.")
     # Validar tipo real de imagen (no solo extensión)
-    kind = imghdr.what(None, h=data)
-    if kind not in {"png", "jpeg"}:
+    try:
+        img = Image.open(io.BytesIO(data))
+        img.verify()  # valida integridad
+        fmt = (img.format or "").lower()
+    except Exception:
+        raise ValueError("El logotipo no es una imagen válida. Usa PNG o JPG/JPEG.")
+    if fmt not in {"png", "jpeg", "jpg"}:
         raise ValueError("Formato de logotipo no soportado. Usa PNG o JPG/JPEG.")
-    suffix = ".png" if kind == "png" else ".jpg"
+    suffix = ".png" if fmt == "png" else ".jpg"
     fd, path = tempfile.mkstemp(prefix="k360_logo_", suffix=suffix)
     os.close(fd)
     with open(path, "wb") as f:
