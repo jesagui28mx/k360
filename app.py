@@ -12,6 +12,12 @@ import imghdr
 import re
 import unicodedata
 
+# -----------------------------
+# CONSTANTES FISCALES (MX) - MVP
+# -----------------------------
+TOPE_ART_151_ABS = 206_367.0  # Tope anual absoluto Art. 151 LISR (estimado, referencia)
+
+
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Simulador Krece360", layout="wide", page_icon="🛡️")
 
@@ -260,9 +266,9 @@ with st.sidebar:
         validar_sueldo = st.checkbox("¿Validar tope con Sueldo Anual?")
         if validar_sueldo:
             sueldo_anual = st.number_input("Sueldo Bruto Anual", value=600000.0, step=10000.0)
-            st.caption(f"Tope 10% ingresos: ${sueldo_anual*0.10:,.0f}")
+            st.caption(f"Tope 10% ingresos: {sueldo_anual*0.10:,.0f} MXN")
         else:
-            st.caption(f"Se usará tope anual absoluto Art. 151: ${TOPE_ART_151_ABS:,.0f} (estimado).")
+            st.caption(f"Se usará tope anual absoluto Art. 151: {TOPE_ART_151_ABS:,.0f} MXN (estimado).")
 
     tasa_bruta = st.slider("Tasa Mercado Bruta (%)", 5.0, 15.0, 10.0) / 100
     inflacion = st.checkbox("Considerar Inflación (4%)", value=True)
