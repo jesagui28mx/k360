@@ -73,6 +73,48 @@ class PDFReport(FPDF):
         self.logo_path = logo_path
         self.fecha_actual = datetime.now().strftime("%d/%m/%Y")
 
+# -----------------------------
+# Sanitización de texto (FPDF usa latin-1)
+# Evita errores tipo: 'latin-1' codec can't encode character '\u2014'
+# -----------------------------
+def _sanitize_pdf_text(self, s):
+    if s is None:
+        return ""
+    s = str(s)
+
+    # Reemplazos comunes de unicode "tipográfico" a ASCII
+    replacements = {
+        "—": "-",   # em dash —
+        "–": "-",   # en dash –
+        "−": "-",   # minus sign −
+        "‘": "'",   # ‘
+        "’": "'",   # ’
+        "“": '"',   # “
+        "”": '"',   # ”
+        "•": "-",   # bullet •
+        " ": " ",   # nbsp
+    }
+    for k, v in replacements.items():
+        s = s.replace(k, v)
+
+    # Normaliza (mantiene acentos que latin-1 soporta)
+    s = unicodedata.normalize("NFKC", s)
+
+    # Garantiza compatibilidad latin-1
+    try:
+        s.encode("latin-1")
+        return s
+    except Exception:
+        return s.encode("latin-1", "replace").decode("latin-1")
+
+# Override para que TODAS las llamadas a cell/multi_cell queden protegidas
+def cell(self, w, h=0, txt="", border=0, ln=0, align="", fill=False, link=""):
+    txt = self._sanitize_pdf_text(txt)
+    return super().cell(w, h, txt, border, ln, align, fill, link)
+
+def multi_cell(self, w, h, txt="", border=0, align="J", fill=False):
+    txt = self._sanitize_pdf_text(txt)
+    return super().multi_cell(w, h, txt, border, align, fill)
     def header(self):
         # 1) Logotipo (opcional)
         if self.logo_path and os.path.exists(self.logo_path):
