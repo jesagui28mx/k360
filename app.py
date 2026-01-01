@@ -446,7 +446,7 @@ if st.button("Generar PDF"):
     # CORRECCIÓN: Pasamos 'acumulado_devoluciones' DIRECTO, sin multiplicar por años otra vez.
     try:
         pdf_bytes, error = crear_pdf(
-            {'nombre': nombre, 'edad': edad, 'retiro': edad_retiro, 'estrategia': estrategia_fiscal},
+            {'nombre': nombre, 'edad': edad, 'retiro': retiro, 'estrategia': estrategia_fiscal},
             {
                 'aporte_mensual': ahorro_mensual,
                 'saldo_final': saldo,
