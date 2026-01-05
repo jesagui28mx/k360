@@ -96,7 +96,7 @@ def require_login():
     st.caption("Ingresa tus credenciales para continuar.")
 
     with st.form("login_form", clear_on_submit=False):
-        username = st.text_input("Usuario", placeholder="ej. jeremy").strip()
+        username = st.text_input("Usuario", placeholder="ej. jay").strip()
         password = st.text_input("Contraseña", type="password")
         submit = st.form_submit_button("Entrar")
 
