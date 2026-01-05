@@ -65,93 +65,96 @@ def obtener_tasa_admin(aporte_mensual, plazo_anios):
             
     return tasa_final
 
-# --- CLASE PDF MODIFICADA (HEADER/FOOTER) ---
-# --- CLASE PDF MODIFICADA (HEADER/FOOTER) ---
+# --- CLASE PDF (PRODUCCIÓN) ---
 class PDFReport(FPDF):
-    def __init__(self, logo_path=None):
+    def __init__(self, advisor_logo_path: str | None = None):
         super().__init__()
-        self.logo_path = logo_path
+        self.advisor_logo_path = advisor_logo_path
         self.fecha_actual = datetime.now().strftime("%d/%m/%Y")
 
-# -----------------------------
-# Sanitización de texto (FPDF usa latin-1)
-# Evita errores tipo: 'latin-1' codec can't encode character '\u2014'
-# -----------------------------
-def _sanitize_pdf_text(self, s):
-    if s is None:
-        return ""
-    s = str(s)
+    # -----------------------------
+    # Sanitización de texto (FPDF usa latin-1)
+    # Evita errores tipo: 'latin-1' codec can't encode character '\u2014'
+    # -----------------------------
+    @staticmethod
+    def _sanitize_pdf_text(s) -> str:
+        if s is None:
+            return ""
+        s = str(s)
 
-    # Reemplazos comunes de unicode "tipográfico" a ASCII
-    replacements = {
-        "—": "-",   # em dash —
-        "–": "-",   # en dash –
-        "−": "-",   # minus sign −
-        "‘": "'",   # ‘
-        "’": "'",   # ’
-        "“": '"',   # “
-        "”": '"',   # ”
-        "•": "-",   # bullet •
-        " ": " ",   # nbsp
-    }
-    for k, v in replacements.items():
-        s = s.replace(k, v)
+        replacements = {
+            "—": "-",   # em dash —
+            "–": "-",   # en dash –
+            "−": "-",   # minus sign −
+            "‘": "'",   # ‘
+            "’": "'",   # ’
+            "“": '"',   # “
+            "”": '"',   # ”
+            "•": "-",   # bullet •
+            "\u00a0": " ",  # nbsp literal
+            " ": " ",   # nbsp
+        }
+        for k, v in replacements.items():
+            s = s.replace(k, v)
 
-    # Normaliza (mantiene acentos que latin-1 soporta)
-    s = unicodedata.normalize("NFKC", s)
+        s = unicodedata.normalize("NFKC", s)
 
-    # Garantiza compatibilidad latin-1
-    try:
-        s.encode("latin-1")
-        return s
-    except Exception:
-        return s.encode("latin-1", "replace").decode("latin-1")
+        # Garantiza compatibilidad latin-1
+        try:
+            s.encode("latin-1")
+            return s
+        except Exception:
+            return s.encode("latin-1", "replace").decode("latin-1")
 
-# Override para que TODAS las llamadas a cell/multi_cell queden protegidas
-def cell(self, w, h=0, txt="", border=0, ln=0, align="", fill=False, link=""):
-    txt = self._sanitize_pdf_text(txt)
-    return super().cell(w, h, txt, border, ln, align, fill, link)
+    # Overwrite para proteger TODAS las impresiones
+    def cell(self, w, h=0, txt="", border=0, ln=0, align="", fill=False, link=""):
+        txt = self._sanitize_pdf_text(txt)
+        return super().cell(w, h, txt, border, ln, align, fill, link)
 
-def multi_cell(self, w, h, txt="", border=0, align="J", fill=False):
-    txt = self._sanitize_pdf_text(txt)
-    return super().multi_cell(w, h, txt, border, align, fill)
+    def multi_cell(self, w, h, txt="", border=0, align="J", fill=False):
+        txt = self._sanitize_pdf_text(txt)
+        return super().multi_cell(w, h, txt, border, align, fill)
+
     def header(self):
-        # 1) Logotipo (opcional)
-        if self.logo_path and os.path.exists(self.logo_path):
+        # Logo del asesor (opcional) - esquina superior derecha
+        if self.advisor_logo_path and os.path.exists(self.advisor_logo_path):
             try:
-                self.image(self.logo_path, 10, 8, 18)  # x, y, width
+                # Ajusta tamaño si quieres
+                self.image(self.advisor_logo_path, x=170, y=8, w=28)
             except Exception:
                 pass
 
-        # 2) Título
-        self.set_font("Arial", "B", 15)
-        self.cell(30)  # margen por logo
-        self.cell(0, 10, "Propuesta Personal de Retiro (PPR) — Simulación estimada", 0, 0, "L")
+        # Título
+        self.set_font("Arial", "B", 14)
+        self.set_text_color(0, 0, 0)
+        self.cell(0, 10, "Propuesta Personal de Retiro (PPR) - Simulacion estimada", 0, 1, "L")
 
-        # 3) Fecha
+        # Fecha
         self.set_font("Arial", "I", 10)
-        self.cell(0, 10, f"Fecha: {self.fecha_actual}", 0, 1, "R")
-        self.ln(6)
+        self.set_text_color(80, 80, 80)
+        self.cell(0, 6, f"Fecha: {self.fecha_actual}", 0, 1, "L")
+        self.ln(4)
+        self.set_text_color(0, 0, 0)
 
     def footer(self):
         # Aviso legal (pie de página)
-        self.set_y(-32)
+        self.set_y(-30)
         self.set_font("Arial", "", 7)
         self.set_text_color(100, 100, 100)
 
         disclaimer = (
-            "Aviso legal: La presente proyección es únicamente informativa y estimativa. "
-            "No constituye una cotización formal ni una oferta vinculante por parte de ninguna institución financiera o aseguradora. "
-            "Los rendimientos no están garantizados y pueden variar. "
-            "Para obtener una cotización oficial y proceder a la contratación, consulte a su asesor."
+            "Aviso legal: La presente proyeccion es unicamente informativa y estimativa. "
+            "No constituye una cotizacion formal ni una oferta vinculante por parte de ninguna institucion "
+            "financiera o aseguradora. Los rendimientos no estan garantizados y pueden variar. "
+            "Para obtener una cotizacion oficial y proceder a la contratacion, consulte a su asesor."
         )
         self.multi_cell(0, 3, disclaimer, 0, "C")
 
         # Paginación
-        self.set_y(-15)
+        self.set_y(-12)
         self.set_text_color(0, 0, 0)
         self.set_font("Arial", "I", 8)
-        self.cell(0, 10, f"Página {self.page_no()} | Generado con Simulador Krece360", 0, 0, "C")
+        self.cell(0, 10, f"Pagina {self.page_no()} | Generado con Simulador Krece360", 0, 0, "C")
 
 
 # --- Helpers de endurecimiento (uploads / archivos) ---
@@ -190,10 +193,27 @@ def _save_logo_to_temp(uploaded_file) -> str | None:
         f.write(data)
     return path
 
+def _prepare_logo_for_pdf(logo_path: str | None) -> str | None:
+    """Convierte el logo a JPG (RGB) para máxima compatibilidad con FPDF. Devuelve la ruta al JPG temporal."""
+    if not logo_path or not os.path.exists(logo_path):
+        return None
+    try:
+        img = Image.open(logo_path)
+        # Si trae alpha/transparencia o modo paleta, convertir a RGB
+        img = img.convert("RGB")
+        fd, out_path = tempfile.mkstemp(prefix="k360_logo_pdf_", suffix=".jpg")
+        os.close(fd)
+        img.save(out_path, format="JPEG", quality=90, optimize=True)
+        return out_path
+    except Exception:
+        # Si falla, intentamos usar el original (por si ya es compatible)
+        return logo_path
+
 
 def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_temp):
     try:
-        pdf = PDFReport(logo_path=ruta_logo_temp)
+        logo_pdf_path = _prepare_logo_for_pdf(ruta_logo_temp)
+        pdf = PDFReport(advisor_logo_path=logo_pdf_path)
         pdf.add_page()
         
         # --- CORRECCIÓN ESPACIO LOGO ---
@@ -275,7 +295,16 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         pdf.cell(0, 8, f"{datos_asesor['nombre']}", 0, 1)
         pdf.cell(0, 8, f"Contacto: {datos_asesor['telefono']}", 0, 1)
 
-        return pdf.output(dest='S').encode('latin-1', 'replace'), None
+        pdf_bytes = pdf.output(dest='S').encode('latin-1', 'replace')
+
+        # Limpieza de logo convertido (si aplica)
+        try:
+            if logo_pdf_path and ruta_logo_temp and os.path.exists(logo_pdf_path) and (logo_pdf_path != ruta_logo_temp):
+                os.remove(logo_pdf_path)
+        except Exception:
+            pass
+
+        return pdf_bytes, None
     except Exception as e:
         return None, str(e)
 
