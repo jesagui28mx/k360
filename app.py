@@ -12,6 +12,122 @@ from PIL import Image
 import re
 import unicodedata
 
+
+# =============================
+# AUTH (login interno) — MVP
+# =============================
+import hashlib
+import hmac
+import time
+
+def _sha256(s: str) -> str:
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+def _get_auth_cfg():
+    """Lee configuración desde st.secrets (Streamlit Cloud)."""
+    cfg = {
+        "enabled": True,
+        "session_ttl_minutes": 12 * 60,   # 12 horas
+        "max_attempts": 8,
+        "lockout_minutes": 5,
+        "users": {}
+    }
+
+    try:
+        if "auth" in st.secrets:
+            s = st.secrets["auth"]
+            cfg["enabled"] = bool(s.get("enabled", cfg["enabled"]))
+            cfg["session_ttl_minutes"] = int(s.get("session_ttl_minutes", cfg["session_ttl_minutes"]))
+            cfg["max_attempts"] = int(s.get("max_attempts", cfg["max_attempts"]))
+            cfg["lockout_minutes"] = int(s.get("lockout_minutes", cfg["lockout_minutes"]))
+            cfg["users"] = dict(s.get("users", {}))
+    except Exception:
+        pass
+
+    return cfg
+
+def _is_locked() -> bool:
+    lock_until = st.session_state.get("_auth_lock_until", 0.0)
+    return time.time() < float(lock_until)
+
+def _register_failed_attempt(cfg):
+    attempts = int(st.session_state.get("_auth_attempts", 0)) + 1
+    st.session_state["_auth_attempts"] = attempts
+
+    if attempts >= cfg["max_attempts"]:
+        lock_seconds = int(cfg["lockout_minutes"]) * 60
+        st.session_state["_auth_lock_until"] = time.time() + lock_seconds
+
+def _reset_attempts():
+    st.session_state["_auth_attempts"] = 0
+    st.session_state["_auth_lock_until"] = 0.0
+
+def _verify_password(plain_password: str, stored_sha256: str) -> bool:
+    calc = _sha256(plain_password or "")
+    return hmac.compare_digest(calc, stored_sha256 or "")
+
+def require_login():
+    """Gate de acceso: si no está autenticado, muestra login y detiene la app."""
+    cfg = _get_auth_cfg()
+
+    if not cfg["enabled"]:
+        return
+
+    # Sesión válida
+    authed = bool(st.session_state.get("_auth_ok", False))
+    auth_ts = float(st.session_state.get("_auth_ts", 0.0))
+    ttl = int(cfg["session_ttl_minutes"]) * 60
+
+    if authed and (time.time() - auth_ts) < ttl:
+        with st.sidebar:
+            if st.button("🔒 Cerrar sesión"):
+                st.session_state["_auth_ok"] = False
+                st.session_state["_auth_user"] = None
+                st.session_state["_auth_role"] = None
+                st.session_state["_auth_ts"] = 0.0
+                st.rerun()
+        return
+
+    if _is_locked():
+        st.error("Demasiados intentos. Intenta más tarde.")
+        st.stop()
+
+    st.title("🔐 Acceso privado")
+    st.caption("Ingresa tus credenciales para continuar.")
+
+    with st.form("login_form", clear_on_submit=False):
+        username = st.text_input("Usuario", placeholder="ej. jeremy").strip()
+        password = st.text_input("Contraseña", type="password")
+        submit = st.form_submit_button("Entrar")
+
+    if not cfg["users"]:
+        st.warning("Auth activo pero no hay usuarios configurados en Secrets. Configura [auth.users].")
+        st.stop()
+
+    if submit:
+        user = cfg["users"].get(username)
+        if not user:
+            _register_failed_attempt(cfg)
+            st.error("Usuario o contraseña incorrectos.")
+            st.stop()
+
+        stored = user.get("password_sha256", "")
+        role = user.get("role", "viewer")
+
+        if _verify_password(password, stored):
+            _reset_attempts()
+            st.session_state["_auth_ok"] = True
+            st.session_state["_auth_user"] = username
+            st.session_state["_auth_role"] = role
+            st.session_state["_auth_ts"] = time.time()
+            st.rerun()
+        else:
+            _register_failed_attempt(cfg)
+            st.error("Usuario o contraseña incorrectos.")
+            st.stop()
+
+    st.stop()
+
 # -----------------------------
 # CONSTANTES FISCALES (MX) - MVP
 # -----------------------------
@@ -20,6 +136,8 @@ TOPE_ART_151_ABS = 206_367.0  # Tope anual absoluto Art. 151 LISR (estimado, ref
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Simulador Krece360", layout="wide", page_icon="🛡️")
+
+require_login()
 
 # --- ESTILOS CSS ---
 st.markdown("""
