@@ -194,20 +194,44 @@ def _save_logo_to_temp(uploaded_file) -> str | None:
     return path
 
 def _prepare_logo_for_pdf(logo_path: str | None) -> str | None:
-    """Convierte el logo a JPG (RGB) para máxima compatibilidad con FPDF. Devuelve la ruta al JPG temporal."""
+    """Convierte el logo a JPG (RGB) con fondo blanco (si trae transparencia) para máxima compatibilidad con FPDF.
+    Devuelve la ruta al JPG temporal.
+    """
     if not logo_path or not os.path.exists(logo_path):
         return None
     try:
         img = Image.open(logo_path)
-        # Si trae alpha/transparencia o modo paleta, convertir a RGB
-        img = img.convert("RGB")
+
+        # Si trae transparencia (RGBA/LA o paleta con transparencia), "aplanar" sobre fondo blanco.
+        has_alpha = (
+            img.mode in ("RGBA", "LA")
+            or (img.mode == "P" and "transparency" in img.info)
+        )
+
+        if has_alpha:
+            rgba = img.convert("RGBA")
+            # Fondo blanco sólido
+            bg = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+            # Componer manteniendo alpha
+            try:
+                bg.alpha_composite(rgba)
+                rgb = bg.convert("RGB")
+            except Exception:
+                # Fallback por si alpha_composite falla
+                rgb_bg = Image.new("RGB", rgba.size, (255, 255, 255))
+                rgb_bg.paste(rgba, mask=rgba.split()[-1])
+                rgb = rgb_bg
+        else:
+            rgb = img.convert("RGB")
+
         fd, out_path = tempfile.mkstemp(prefix="k360_logo_pdf_", suffix=".jpg")
         os.close(fd)
-        img.save(out_path, format="JPEG", quality=90, optimize=True)
+        rgb.save(out_path, format="JPEG", quality=92, optimize=True)
         return out_path
     except Exception:
         # Si falla, intentamos usar el original (por si ya es compatible)
         return logo_path
+
 
 
 def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_temp):
