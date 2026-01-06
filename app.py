@@ -454,9 +454,55 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         pdf.set_font("Arial", 'I', 10)
         pdf.cell(0, 10, f"   (Tasa Admin Aplicada: {datos_fin['tasa_admin_pct']:.2f}%)", 0, 1)
         
+
         pdf.set_y(y_actual + 50)
-        
+
+        # Comparador de Escenarios (mini-tabla)
+        comp = datos_fin.get('comparador') if isinstance(datos_fin, dict) else None
+        if comp and isinstance(comp, list):
+            try:
+                pdf.ln(2)
+                pdf.set_font("Arial", 'B', 12)
+                pdf.cell(0, 10, "Comparación de escenarios (resumen):", 0, 1)
+
+                # Encabezados
+                pdf.set_font("Arial", 'B', 10)
+                pdf.set_fill_color(240, 242, 246)
+                pdf.set_draw_color(200, 200, 200)
+
+                col1, col2, col3 = 85, 40, 55  # total 180 aprox dentro de márgenes
+                pdf.cell(col1, 8, "Escenario", 1, 0, 'L', True)
+                pdf.cell(col2, 8, "Tasa neta", 1, 0, 'C', True)
+                pdf.cell(col3, 8, "Monto al retiro", 1, 1, 'R', True)
+
+                pdf.set_font("Arial", size=10)
+
+                # Filas (máximo 4 para no saturar)
+                for r in comp[:4]:
+                    esc = str(r.get('escenario', ''))
+                    tasa = r.get('tasa_neta_pct', None)
+                    monto = r.get('monto_retiro', None)
+
+                    tasa_txt = f"{float(tasa):.2f}%" if tasa is not None else ""
+                    monto_txt = f"${float(monto):,.0f}" if monto is not None else ""
+
+                    pdf.cell(col1, 8, esc, 1, 0, 'L')
+                    pdf.cell(col2, 8, tasa_txt, 1, 0, 'C')
+                    pdf.cell(col3, 8, monto_txt, 1, 1, 'R')
+
+                pdf.ln(2)
+                pdf.set_font("Arial", 'I', 9)
+                pdf.multi_cell(
+                    0, 4,
+                    "Nota: El escenario optimista puede presentar mayor volatilidad. "
+                    "El recomendado busca equilibrio entre crecimiento y control del riesgo."
+                )
+                pdf.ln(2)
+            except Exception:
+                pass
+
         # Análisis Fiscal
+
         pdf.set_font("Arial", 'B', 12)
         pdf.cell(0, 10, "Análisis fiscal simplificado:", 0, 1)
         pdf.set_font("Arial", size=11)
@@ -743,6 +789,7 @@ escenarios = [
 if modo_avanzado:
     escenarios.insert(2, {"Escenario": "🟣 Personalizado (tu tasa)", "Perfil": "Manual", "Moneda": "—", "tasa_bruta": float(tasa_bruta)})
 
+comparador_pdf = []
 rows = []
 for s in escenarios:
     saldo_final_s, tasa_neta_s = proyectar_saldo_final(
@@ -761,6 +808,11 @@ for s in escenarios:
         tope_art_185=float(TOPE_ART_185),
         reinvertir_beneficio=bool(reinvertir_beneficio),
     )
+    comparador_pdf.append({
+        'escenario': str(s['Escenario']),
+        'tasa_neta_pct': float(tasa_neta_s)*100.0,
+        'monto_retiro': float(saldo_final_s),
+    })
 
     rows.append({
         "Escenario": s["Escenario"],
@@ -805,7 +857,8 @@ if st.button("Generar PDF"):
                 'saldo_final': saldo,
                 'beneficio_sat': acumulado_devoluciones,
                 'tasa_admin_pct': tasa_admin_real * 100,
-                'total_aportado': total_aportado
+                'total_aportado': total_aportado,
+                'comparador': comparador_pdf
             },
             {'texto_analisis': texto_analisis_pdf, 'alerta_excedente': texto_alerta_pdf},
             {'nombre': asesor_nombre, 'telefono': asesor_telefono},
