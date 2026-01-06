@@ -132,6 +132,7 @@ def require_login():
 # CONSTANTES FISCALES (MX) - MVP
 # -----------------------------
 TOPE_ART_151_ABS = 206_367.0  # Tope anual absoluto Art. 151 LISR (estimado, referencia)
+TOPE_ART_185 = 152_000.0  # Tope anual Art. 185 LISR (estimado; ajustable según criterio/actualización)
 
 
 # --- CONFIGURACIÓN DE PÁGINA ---
