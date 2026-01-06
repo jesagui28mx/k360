@@ -183,6 +183,62 @@ def obtener_tasa_admin(aporte_mensual, plazo_anios):
             
     return tasa_final
 
+
+
+# -----------------------------
+# Helper: proyección rápida para comparar escenarios
+# -----------------------------
+def proyectar_saldo_final(
+    ahorro_mensual: float,
+    plazo_anos: int,
+    edad: int,
+    tasa_bruta_scenario: float,
+    tasa_admin_real: float,
+    inflacion: bool,
+    tasa_inflacion: float,
+    estrategia_fiscal: str,
+    validar_sueldo: bool,
+    sueldo_anual: float,
+    isr_cliente: float,
+    tope_art_151_abs: float,
+    tope_art_185: float,
+    reinvertir_beneficio: bool,
+):
+    tasa_neta = max(0.0, float(tasa_bruta_scenario) - float(tasa_admin_real))
+    meses = int(plazo_anos) * 12
+    saldo = 0.0
+    aporte_actual = float(ahorro_mensual)
+
+    if estrategia_fiscal == "Art 151 (PPR - Deducible)":
+        tope_deducible_anual = float(tope_art_151_abs)
+        if validar_sueldo:
+            tope_deducible_anual = min(float(tope_art_151_abs), float(sueldo_anual) * 0.10)
+    elif estrategia_fiscal == "Art 185 (Diferimiento)":
+        tope_deducible_anual = float(tope_art_185)
+    else:
+        tope_deducible_anual = 0.0
+
+    aporte_anual_real = 0.0
+
+    for i in range(1, meses + 1):
+        saldo += saldo * (tasa_neta / 12.0)
+        saldo += aporte_actual
+        aporte_anual_real += aporte_actual
+
+        if i % 12 == 0:
+            if tope_deducible_anual > 0:
+                base_devolucion = min(aporte_anual_real, tope_deducible_anual)
+                devolucion_anio = base_devolucion * float(isr_cliente)
+                if reinvertir_beneficio:
+                    saldo += devolucion_anio
+
+            aporte_anual_real = 0.0
+            if inflacion:
+                aporte_actual *= (1.0 + float(tasa_inflacion))
+
+    return saldo, tasa_neta
+
+
 # --- CLASE PDF (PRODUCCIÓN) ---
 class PDFReport(FPDF):
     def __init__(self, advisor_logo_path: str | None = None):
@@ -471,15 +527,22 @@ with st.sidebar:
     ahorro_mensual = st.number_input("Ahorro Mensual", value=2000.0, step=500.0)
     
     st.subheader("Fiscalidad y Rendimiento")
-    # Agregamos la opción Art 185 que pediste
-    estrategia_fiscal = st.selectbox("Estrategia Fiscal", 
-                                     ["Art 151 (PPR - Deducible)", 
-                                      "Art 93 (No Deducible)", 
-                                      "Art 185 (Diferimiento)"])
-    
-    sueldo_anual = 0
+
+    estrategia_fiscal = st.selectbox(
+        "Estrategia Fiscal",
+        ["Art 151 (PPR - Deducible)", "Art 93 (No Deducible)", "Art 185 (Diferimiento)"]
+    )
+
+    isr_cliente = st.selectbox(
+        "% ISR del cliente",
+        ["10%", "15%", "20%", "25%", "30%", "32%", "34%", "35%"],
+        index=4
+    )
+    isr_cliente = float(isr_cliente.replace("%", "")) / 100.0
+
+    sueldo_anual = 0.0
     validar_sueldo = False
-    
+
     if estrategia_fiscal == "Art 151 (PPR - Deducible)":
         validar_sueldo = st.checkbox("¿Validar tope con Sueldo Anual?")
         if validar_sueldo:
@@ -488,9 +551,36 @@ with st.sidebar:
         else:
             st.caption(f"Se usará tope anual absoluto Art. 151: {TOPE_ART_151_ABS:,.0f} MXN (estimado).")
 
-    tasa_bruta = st.slider("Tasa Mercado Bruta (%)", 5.0, 15.0, 10.0) / 100
+    reinvertir_beneficio = st.radio(
+        "Beneficio fiscal",
+        ["Retirar (cash)", "Reinvertir en el plan"],
+        horizontal=True,
+        index=0
+    ) == "Reinvertir en el plan"
+
+    perfil_k360 = st.selectbox(
+        "Perfil de inversión (K360)",
+        ["Conservador", "Balanceado (Recomendado)", "Dinámico (Optimista)"],
+        index=1
+    )
+
+    tasas_perfil = {
+        "Conservador": 0.06,
+        "Balanceado (Recomendado)": 0.085,
+        "Dinámico (Optimista)": 0.105
+    }
+    tasa_bruta_sugerida = tasas_perfil.get(perfil_k360, 0.085)
+
+    modo_avanzado = st.checkbox("Modo avanzado: definir tasa manual", value=False)
+    if modo_avanzado:
+        tasa_bruta = st.slider("Tasa Mercado Bruta (%)", 5.0, 15.0, float(tasa_bruta_sugerida*100), step=0.1) / 100.0
+    else:
+        tasa_bruta = float(tasa_bruta_sugerida)
+        st.caption(f"Tasa bruta sugerida para {perfil_k360}: {tasa_bruta*100:.2f}%")
+
     inflacion = st.checkbox("Considerar Inflación (4%)", value=True)
     tasa_inflacion = 0.04 if inflacion else 0.0
+
     
     st.markdown("---")
     st.subheader("Personalización (PDF)")
@@ -499,12 +589,6 @@ with st.sidebar:
     asesor_telefono = st.text_input("Teléfono / WhatsApp", value="55-0000-0000")
 
 # --- 2. CÁLCULOS MATEMÁTICOS ---
-
-UMA_ANUAL = 39606.36
-TOPE_5_UMAS = UMA_ANUAL * 5  # referencia (UMAs)
-TOPE_ART_151_ABS = 206367.0  # Tope anual absoluto (Art. 151) según material del producto
-TOPE_ART_185 = 152000.0  # Tope anual (Art. 185) según material del producto
-ISR_ESTIMADO = 0.30 
 
 # --- APLICACIÓN DE TASA REAL (ALLIANZ) ---
 tasa_admin_real = obtener_tasa_admin(ahorro_mensual, plazo_anos)
@@ -557,8 +641,10 @@ for i in range(1, meses + 1):
             aporte_anual_real = aporte_actual * 12 # Aprox del año corriente
             # La base de devolución es el menor entre lo aportado y el tope legal
             base_devolucion = min(aporte_anual_real, tope_deducible_anual)
-            devolucion_anio = base_devolucion * ISR_ESTIMADO
+            devolucion_anio = base_devolucion * isr_cliente
             acumulado_devoluciones += devolucion_anio
+            if reinvertir_beneficio:
+                saldo += devolucion_anio
 
     data.append({
         "Mes": i,
@@ -639,6 +725,60 @@ chart = alt.Chart(df_chart).mark_line().encode(
 ).properties(height=400)
 
 st.altair_chart(chart, use_container_width=True)
+
+
+# -----------------------------
+# Comparador de escenarios (UI)
+# -----------------------------
+st.markdown("---")
+st.subheader("📊 Comparación de Escenarios")
+st.caption("Mismos datos, distintos supuestos. No es promesa: es simulación con diferentes niveles de riesgo.")
+
+escenarios = [
+    {"Escenario": "🟢 Conservador", "Perfil": "Conservador", "Moneda": "MXN", "tasa_bruta": 0.06},
+    {"Escenario": "⭐ Recomendado K360", "Perfil": "Balanceado", "Moneda": "MXN", "tasa_bruta": 0.085},
+    {"Escenario": "🟠 Optimista (Allianz-style)", "Perfil": "Dinámico", "Moneda": "USD", "tasa_bruta": 0.105},
+]
+
+if modo_avanzado:
+    escenarios.insert(2, {"Escenario": "🟣 Personalizado (tu tasa)", "Perfil": "Manual", "Moneda": "—", "tasa_bruta": float(tasa_bruta)})
+
+rows = []
+for s in escenarios:
+    saldo_final_s, tasa_neta_s = proyectar_saldo_final(
+        ahorro_mensual=float(ahorro_mensual),
+        plazo_anos=int(plazo_anos),
+        edad=int(edad),
+        tasa_bruta_scenario=float(s["tasa_bruta"]),
+        tasa_admin_real=float(tasa_admin_real),
+        inflacion=bool(inflacion),
+        tasa_inflacion=float(tasa_inflacion),
+        estrategia_fiscal=str(estrategia_fiscal),
+        validar_sueldo=bool(validar_sueldo),
+        sueldo_anual=float(sueldo_anual),
+        isr_cliente=float(isr_cliente),
+        tope_art_151_abs=float(TOPE_ART_151_ABS),
+        tope_art_185=float(TOPE_ART_185),
+        reinvertir_beneficio=bool(reinvertir_beneficio),
+    )
+
+    rows.append({
+        "Escenario": s["Escenario"],
+        "Perfil": s["Perfil"],
+        "Moneda": s["Moneda"],
+        "Tasa Bruta": f"{float(s['tasa_bruta'])*100:.2f}%",
+        "Tasa Neta (bruta - admin)": f"{float(tasa_neta_s)*100:.2f}%",
+        "Monto estimado al retiro": f"${float(saldo_final_s):,.0f}",
+    })
+
+df_comp = pd.DataFrame(rows)
+st.dataframe(df_comp, hide_index=True, use_container_width=True)
+
+st.info(
+    "ℹ️ **Por qué cambia el monto:** el rendimiento depende del nivel de riesgo (perfil) y los supuestos. "
+    "El escenario optimista puede tener años negativos; el conservador prioriza estabilidad."
+)
+
 
 st.info(f"""
 ℹ️ **Cálculo de Costos:** Se está aplicando una tasa administrativa de **{tasa_admin_real*100:.2f}%** anual, 
