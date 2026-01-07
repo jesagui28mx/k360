@@ -911,3 +911,8 @@ if st.button("Generar PDF"):
             file_name=f"Propuesta_Krece360_{_safe_filename(nombre)}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
             mime="application/pdf"
         )
+
+# MANUAL_AGENTES_K360
+# - Optimista (Allianz-style): escenario calibrado para comparar con simuladores comerciales.
+# - Recomendado K360: equilibrio entre crecimiento y riesgo (sugerido).
+# - Personalizado: planeación avanzada con tasa editable.
