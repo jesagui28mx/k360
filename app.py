@@ -553,6 +553,47 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         # Análisis Fiscal
 
         pdf.set_font("Arial", 'B', 12)
+        
+        # -----------------------------
+        # Comparación de escenarios (PDF)
+        # -----------------------------
+        try:
+            pdf.ln(2)
+            pdf.set_font("Arial", "B", 12)
+            pdf.cell(0, 8, "Comparación de escenarios (resumen)", 0, 1)
+
+            pdf.set_font("Arial", "", 9)
+            pdf.multi_cell(0, 5, "Mismos datos, distintos supuestos. No es promesa: es simulación con diferentes niveles de riesgo.")
+            pdf.ln(1)
+
+            # Encabezados
+            pdf.set_font("Arial", "B", 8)
+            w_esc, w_perf, w_mon, w_tb, w_tn, w_fin, w_obj = 34, 22, 10, 14, 16, 47, 47
+            pdf.cell(w_esc, 6, "Escenario", 1, 0)
+            pdf.cell(w_perf, 6, "Perfil", 1, 0)
+            pdf.cell(w_mon, 6, "Mon", 1, 0)
+            pdf.cell(w_tb, 6, "T.Bruta", 1, 0)
+            pdf.cell(w_tn, 6, "T.Neta", 1, 0)
+            pdf.cell(w_fin, 6, "Monto a fin aportes", 1, 0)
+            pdf.cell(w_obj, 6, "Monto a edad objetivo", 1, 1)
+
+            pdf.set_font("Arial", "", 8)
+            for row in tabla_escenarios:
+                pdf.cell(w_esc, 6, str(row.get("Escenario",""))[:20], 1, 0)
+                pdf.cell(w_perf, 6, str(row.get("Perfil",""))[:14], 1, 0)
+                pdf.cell(w_mon, 6, str(row.get("Moneda",""))[:3], 1, 0)
+                pdf.cell(w_tb, 6, str(row.get("Tasa Bruta",""))[:8], 1, 0)
+                pdf.cell(w_tn, 6, str(row.get("Tasa Neta",""))[:8], 1, 0)
+                pdf.cell(w_fin, 6, str(row.get("Monto a fin aportes",""))[:15], 1, 0)
+                pdf.cell(w_obj, 6, str(row.get("Monto a edad objetivo",""))[:15], 1, 1)
+
+            if any("Allianz-style" in str(r.get("Escenario","")) for r in tabla_escenarios):
+                pdf.ln(1)
+                pdf.set_font("Arial", "I", 7)
+                pdf.multi_cell(0, 4, "Nota: El escenario Optimista (Allianz-style) puede incluir calibración para reflejar fricciones/cargos de un simulador comercial.")
+        except Exception:
+            pass
+
         pdf.cell(0, 10, "Análisis fiscal simplificado:", 0, 1)
         pdf.set_font("Arial", size=11)
         pdf.multi_cell(0, 8, datos_fiscales['texto_analisis'])
