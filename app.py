@@ -223,7 +223,8 @@ def proyectar_saldo_final(
 
     aporte_anual_real = 0.0
 
-    for i in range(1, meses + 1):
+    saldo_al_fin_aportes = None
+    for i in range(1, total_meses + 1):
         saldo += saldo * (tasa_neta / 12.0)
         saldo += aporte_actual
         aporte_anual_real += aporte_actual
@@ -575,12 +576,18 @@ with st.sidebar:
     nombre = st.text_input("Nombre Cliente", value="Juan Pérez")
     
     st.subheader("Configuración Plan")
-    col_edad, col_retiro = st.columns(2)
-    edad = col_edad.number_input("Edad", value=30, step=1)
-    retiro = col_retiro.number_input("Edad Retiro", value=65, step=1)
-    
-    # Validación simple de plazo
-    plazo_anos = retiro - edad
+    col_edad, col_fin, col_obj = st.columns(3)
+edad = col_edad.number_input("Edad", value=30, step=1)
+edad_fin_aportes = col_fin.number_input("Fin de aportaciones (edad)", value=55, step=1, help="Edad a la que dejas de aportar (plazo comprometido).")
+retiro = col_obj.number_input("Edad objetivo (retiro real)", value=65, step=1, help="Edad a la que quieres ver el saldo (puede ser mayor al fin de aportaciones).")
+
+# Validación: fin aportes >= edad y objetivo >= fin aportes
+if edad_fin_aportes < edad:
+    st.error("La edad de fin de aportaciones no puede ser menor que la edad actual.")
+if retiro < edad_fin_aportes:
+    st.error("La edad objetivo debe ser mayor o igual al fin de aportaciones.")
+# Validación simple de plazo
+    plazo_anos = int(edad_fin_aportes - edad)
     if plazo_anos < 5:
         st.error("El plazo debe ser mayor a 5 años")
 
@@ -674,7 +681,8 @@ if tasa_interes_neta < 0:
     tasa_interes_neta = 0.0
 
 
-meses = plazo_anos * 12
+contrib_meses = int(plazo_anos) * 12
+    total_meses = int((retiro - edad) * 12)
 data = []
 
 saldo = 0
@@ -698,11 +706,14 @@ else:
 for i in range(1, meses + 1):
     # Rendimiento sobre saldo acumulado (usando Tasa Neta)
     rendimiento_mensual = saldo * (tasa_interes_neta / 12)
-    saldo += rendimiento_mensual + aporte_actual
+    aporte_mes = aporte_actual if i <= contrib_meses else 0.0
+        saldo += rendimiento_mensual + aporte_mes
+        if i == contrib_meses:
+            saldo_al_fin_aportes = saldo
     total_aportado += aporte_actual
     
     # Ajuste inflacionario anual de la aportación
-    if i % 12 == 0 and inflacion:
+    if i % 12 == 0 and inflacion and i <= contrib_meses:
         aporte_actual *= (1 + tasa_inflacion)
     
     # Cálculo Beneficio Fiscal (SAT)
