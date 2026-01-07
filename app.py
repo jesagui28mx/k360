@@ -133,6 +133,8 @@ def require_login():
 # -----------------------------
 TOPE_ART_151_ABS = 206_367.0  # Tope anual absoluto Art. 151 LISR (estimado, referencia)
 TOPE_ART_185 = 152_000.0  # Tope anual Art. 185 LISR (estimado; ajustable según criterio/actualización)
+FACTOR_CALIBRACION_ALLIANZ = 0.90  # Ajuste calibrado para replicar simulador Allianz en escenario Allianz-style
+
 
 
 # --- CONFIGURACIÓN DE PÁGINA ---
@@ -415,7 +417,7 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
     try:
         logo_pdf_path = _prepare_logo_for_pdf(ruta_logo_temp)
         pdf = PDFReport(advisor_logo_path=logo_pdf_path)
-        pdf.set_auto_page_break(auto=True, margin=28)
+        pdf.set_auto_page_break(auto=True, margin=34)
         pdf.add_page()
         
         # --- CORRECCIÓN ESPACIO LOGO ---
@@ -434,14 +436,14 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         # Resumen de la estrategia
         pdf.set_font("Arial", 'B', 12)
         pdf.cell(0, 8, "Resumen de la estrategia", 0, 1)
-        pdf.set_font("Arial", size=10)
+        pdf.set_font("Arial", size=9)
         resumen = (
             "Con base en la información proporcionada, esta simulación presenta una proyección estimada "
             "de ahorro para el retiro mediante un Plan Personal de Retiro (PPR), considerando aportaciones "
             "periódicas, un horizonte de largo plazo y el tratamiento fiscal conforme a la legislación vigente. "
             "Los resultados son estimativos y no representan una garantía de rendimiento futuro."
         )
-        pdf.multi_cell(0, 5, resumen)
+        pdf.multi_cell(0, 4.5, resumen)
         pdf.ln(2)
 
         # Resumen Financiero
@@ -466,20 +468,20 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         if comp and isinstance(comp, list):
             try:
                 pdf.ln(2)
-                pdf.set_font("Arial", 'B', 12)
-                pdf.cell(0, 10, "Comparación de escenarios (resumen):", 0, 1)
+                pdf.set_font("Arial", 'B', 11)
+                pdf.cell(0, 8, "Comparación de escenarios (resumen):", 0, 1)
 
                 # Encabezados
-                pdf.set_font("Arial", 'B', 10)
+                pdf.set_font("Arial", 'B', 9)
                 pdf.set_fill_color(240, 242, 246)
                 pdf.set_draw_color(200, 200, 200)
 
                 col1, col2, col3 = 85, 40, 55  # total 180 aprox dentro de márgenes
-                pdf.cell(col1, 8, "Escenario", 1, 0, 'L', True)
-                pdf.cell(col2, 8, "Tasa neta", 1, 0, 'C', True)
-                pdf.cell(col3, 8, "Monto al retiro", 1, 1, 'R', True)
+                pdf.cell(col1, 6, "Escenario", 1, 0, 'L', True)
+                pdf.cell(col2, 6, "Tasa neta", 1, 0, 'C', True)
+                pdf.cell(col3, 6, "Monto al retiro", 1, 1, 'R', True)
 
-                pdf.set_font("Arial", size=10)
+                pdf.set_font("Arial", size=9)
 
                 # Filas (máximo 4 para no saturar)
                 for r in comp[:4]:
@@ -490,9 +492,17 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
                     tasa_txt = f"{float(tasa):.2f}%" if tasa is not None else ""
                     monto_txt = f"${float(monto):,.0f}" if monto is not None else ""
 
-                    pdf.cell(col1, 8, esc, 1, 0, 'L')
-                    pdf.cell(col2, 8, tasa_txt, 1, 0, 'C')
-                    pdf.cell(col3, 8, monto_txt, 1, 1, 'R')
+                    pdf.cell(col1, 6, esc, 1, 0, 'L')
+                    pdf.cell(col2, 6, tasa_txt, 1, 0, 'C')
+                    pdf.cell(col3, 6, monto_txt, 1, 1, 'R')
+
+                # Nota de calibración (solo si aplica)
+                if any('Allianz-style' in str(x.get('escenario','')) for x in comp):
+                    pdf.ln(1)
+                    pdf.set_font("Arial", 'I', 7)
+                    pdf.set_text_color(90, 90, 90)
+                    pdf.multi_cell(0, 3.5, "Nota: El escenario Allianz-style incluye un ajuste de calibración para reflejar cargos y fricciones propias del producto comercial.")
+                    pdf.set_text_color(0, 0, 0)
 
                 pdf.ln(2)
                 pdf.set_font("Arial", 'I', 9)
@@ -823,6 +833,10 @@ for s in escenarios:
         tope_art_185=float(TOPE_ART_185),
         reinvertir_beneficio=bool(reinvertir_beneficio),
     )
+    # Calibración Allianz (solo para el escenario Allianz-style)
+    if 'Allianz-style' in str(s.get('Escenario','')):
+        saldo_final_s = float(saldo_final_s) * float(FACTOR_CALIBRACION_ALLIANZ)
+
     comparador_pdf.append({
         'escenario': str(s['Escenario']),
         'tasa_neta_pct': float(tasa_neta_s)*100.0,
