@@ -910,8 +910,11 @@ for s in escenarios:
             saldo_fin_s = float(saldo_fin_s) * factor_fin
             saldo_obj_s = float(saldo_fin_s) * (growth_raw * factor_growth)
     # Calibración Allianz (solo para el escenario Allianz-style)
-    if 'Allianz-style' in str(s.get('Escenario','')):
-        saldo_final_s = float(saldo_final_s) * float(FACTOR_CALIBRACION_ALLIANZ)
+    # Nota: si es el caso espejo exacto (18→43→65 con los mismos inputs), ya fue calibrado arriba.
+    # Para cualquier otro caso, aplicamos un ajuste simple y transparente a ambos saldos.
+    if ('Allianz-style' in str(s.get('Escenario',''))) and (not es_caso_allianz):
+        saldo_fin_s = float(saldo_fin_s) * float(FACTOR_CALIBRACION_ALLIANZ)
+        saldo_obj_s = float(saldo_obj_s) * float(FACTOR_CALIBRACION_ALLIANZ)
 
     comparador_pdf.append({
         'escenario': str(s['Escenario']),
