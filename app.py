@@ -682,7 +682,7 @@ if tasa_interes_neta < 0:
 
 
 contrib_meses = int(plazo_anos) * 12
-    total_meses = int((retiro - edad) * 12)
+total_meses = int((retiro - edad) * 12)
 data = []
 
 saldo = 0
@@ -703,14 +703,15 @@ else:
     tope_deducible_anual = 0 # Art 93 no deduce
 
 # Bucle de Proyección
-for i in range(1, meses + 1):
+saldo_al_fin_aportes = None
+for i in range(1, total_meses + 1):
     # Rendimiento sobre saldo acumulado (usando Tasa Neta)
     rendimiento_mensual = saldo * (tasa_interes_neta / 12)
     aporte_mes = aporte_actual if i <= contrib_meses else 0.0
-        saldo += rendimiento_mensual + aporte_mes
-        if i == contrib_meses:
-            saldo_al_fin_aportes = saldo
-    total_aportado += aporte_actual
+    saldo += rendimiento_mensual + aporte_mes
+    if i == contrib_meses:
+        saldo_al_fin_aportes = saldo
+    total_aportado += aporte_mes
     
     # Ajuste inflacionario anual de la aportación
     if i % 12 == 0 and inflacion and i <= contrib_meses:
