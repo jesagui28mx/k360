@@ -868,8 +868,9 @@ rows = []
 for s in escenarios:
     saldo_fin_s, saldo_obj_s, tasa_neta_s = proyectar_saldos_dos_fases(
         ahorro_mensual=float(ahorro_mensual),
-        plazo_anos=int(plazo_anos),
-        edad=int(edad),
+        edad_actual=int(edad),
+        edad_fin_aportes=int(edad_fin_aportes),
+        edad_objetivo=int(retiro),
         tasa_bruta_scenario=float(s["tasa_bruta"]),
         tasa_admin_real=float(tasa_admin_real),
         inflacion=bool(inflacion),
