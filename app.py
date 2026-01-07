@@ -223,8 +223,7 @@ def proyectar_saldo_final(
 
     aporte_anual_real = 0.0
 
-    saldo_al_fin_aportes = None
-    for i in range(1, total_meses + 1):
+    for i in range(1, meses + 1):
         saldo += saldo * (tasa_neta / 12.0)
         saldo += aporte_actual
         aporte_anual_real += aporte_actual
@@ -430,7 +429,7 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         pdf.set_font("Arial", 'B', 14)
         pdf.cell(0, 10, f"Propuesta para: {datos_cliente['nombre']}", 0, 1)
         pdf.set_font("Arial", size=12)
-        pdf.cell(0, 10, f"Edad Actual: {datos_cliente['edad']} | Edad Retiro: {datos_cliente['retiro']}", 0, 1)
+        pdf.cell(0, 10, f"Edad Actual: {datos_cliente['edad']} | Fin aportaciones: {datos_cliente.get('edad_fin_aportes', datos_cliente['retiro'])} | Edad objetivo: {datos_cliente['retiro']}", 0, 1)
         pdf.cell(0, 10, f"Estrategia: {datos_cliente['estrategia']}", 0, 1)
         pdf.ln(5)
 
@@ -456,7 +455,8 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         pdf.set_font("Arial", 'B', 12)
         pdf.cell(0, 10, f"   Aportación Mensual: ${datos_fin['aporte_mensual']:,.2f}", 0, 1)
         pdf.cell(0, 10, f"   Total aportado estimado: ${datos_fin['total_aportado']:,.2f}", 0, 1)
-        pdf.cell(0, 10, f"   Saldo Estimado al Retiro: ${datos_fin['saldo_final']:,.2f}", 0, 1)
+        pdf.cell(0, 10, f"   Saldo al fin de aportaciones: ${datos_fin.get('saldo_fin_aportes', 0.0):,.2f}", 0, 1)
+        pdf.cell(0, 10, f"   Saldo estimado a edad objetivo: ${datos_fin['saldo_final']:,.2f}", 0, 1)
         pdf.cell(0, 10, f"   Beneficio SAT Estimado: ${datos_fin['beneficio_sat']:,.2f}", 0, 1) # Aquí va el dato corregido
         pdf.set_font("Arial", 'I', 10)
         pdf.cell(0, 10, f"   (Tasa Admin Aplicada: {datos_fin['tasa_admin_pct']:.2f}%)", 0, 1)
@@ -577,19 +577,20 @@ with st.sidebar:
     
     st.subheader("Configuración Plan")
     col_edad, col_fin, col_obj = st.columns(3)
-edad = col_edad.number_input("Edad", value=30, step=1)
-edad_fin_aportes = col_fin.number_input("Fin de aportaciones (edad)", value=55, step=1, help="Edad a la que dejas de aportar (plazo comprometido).")
-retiro = col_obj.number_input("Edad objetivo (retiro real)", value=65, step=1, help="Edad a la que quieres ver el saldo (puede ser mayor al fin de aportaciones).")
+    edad = col_edad.number_input("Edad", value=30, step=1)
+    edad_fin_aportes = col_fin.number_input(        "Fin de aportaciones (edad)", value=55, step=1, help="Edad a la que dejas de aportar (plazo comprometido).")
+    retiro = col_obj.number_input(        "Edad objetivo (retiro real)", value=65, step=1, help="Edad a la que quieres ver el saldo; puede ser mayor al fin de aportaciones.")
 
-# Validación: fin aportes >= edad y objetivo >= fin aportes
-if edad_fin_aportes < edad:
-    st.error("La edad de fin de aportaciones no puede ser menor que la edad actual.")
-if retiro < edad_fin_aportes:
-    st.error("La edad objetivo debe ser mayor o igual al fin de aportaciones.")
-# Validación simple de plazo
+    # Validaciones
+    if edad_fin_aportes < edad:
+        st.error("La edad de fin de aportaciones no puede ser menor que la edad actual.")
+    if retiro < edad_fin_aportes:
+        st.error("La edad objetivo debe ser mayor o igual al fin de aportaciones.")
+
+    # Plazo comprometido (años con aportaciones)
     plazo_anos = int(edad_fin_aportes - edad)
     if plazo_anos < 5:
-        st.error("El plazo debe ser mayor a 5 años")
+        st.error("El plazo de aportaciones debe ser mayor a 5 años")
 
     ahorro_mensual = st.number_input("Ahorro Mensual", value=2000.0, step=500.0)
     
@@ -681,8 +682,11 @@ if tasa_interes_neta < 0:
     tasa_interes_neta = 0.0
 
 
-contrib_meses = int(plazo_anos) * 12
-total_meses = int((retiro - edad) * 12)
+contrib_meses = int(plazo_anos) * 12  # meses con aportaciones
+total_meses = int((retiro - edad) * 12)  # horizonte total hasta edad objetivo
+if total_meses < contrib_meses:
+    st.error("La edad objetivo no puede ser menor que el fin de aportaciones.")
+saldo_al_fin_aportes = None
 data = []
 
 saldo = 0
@@ -703,15 +707,14 @@ else:
     tope_deducible_anual = 0 # Art 93 no deduce
 
 # Bucle de Proyección
-saldo_al_fin_aportes = None
 for i in range(1, total_meses + 1):
     # Rendimiento sobre saldo acumulado (usando Tasa Neta)
     rendimiento_mensual = saldo * (tasa_interes_neta / 12)
     aporte_mes = aporte_actual if i <= contrib_meses else 0.0
     saldo += rendimiento_mensual + aporte_mes
+    total_aportado += aporte_mes
     if i == contrib_meses:
         saldo_al_fin_aportes = saldo
-    total_aportado += aporte_mes
     
     # Ajuste inflacionario anual de la aportación
     if i % 12 == 0 and inflacion and i <= contrib_meses:
@@ -719,7 +722,7 @@ for i in range(1, total_meses + 1):
     
     # Cálculo Beneficio Fiscal (SAT)
     # Lo calculamos año con año para que sea exacto y sumamos el monto nominal
-    if estrategia_fiscal != "Art 93 (No Deducible)":
+    if estrategia_fiscal != "Art 93 (No Deducible)" and i <= contrib_meses:
         if i % 12 == 0: # Al final de cada año calculamos la devolución de ese año
             aporte_anual_real = aporte_actual * 12 # Aprox del año corriente
             # La base de devolución es el menor entre lo aportado y el tope legal
@@ -892,9 +895,10 @@ if st.button("Generar PDF"):
     # CORRECCIÓN: Pasamos 'acumulado_devoluciones' DIRECTO, sin multiplicar por años otra vez.
     try:
         pdf_bytes, error = crear_pdf(
-            {'nombre': nombre, 'edad': edad, 'retiro': retiro, 'estrategia': estrategia_fiscal},
+            {'nombre': nombre, 'edad': edad, 'edad_fin_aportes': edad_fin_aportes, 'retiro': retiro, 'estrategia': estrategia_fiscal},
             {
                 'aporte_mensual': ahorro_mensual,
+                'saldo_fin_aportes': saldo_al_fin_aportes if saldo_al_fin_aportes is not None else saldo,
                 'saldo_final': saldo,
                 'beneficio_sat': acumulado_devoluciones,
                 'tasa_admin_pct': tasa_admin_real * 100,
