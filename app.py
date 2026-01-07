@@ -974,6 +974,57 @@ correspondiente a una aportación de ${ahorro_mensual:,.0f} a un plazo de {plazo
 # --- 5. SECCIÓN DE DESCARGA PDF ---
 st.markdown("### 📄 Exportar Propuesta")
 
+# Asegurar que la tabla de escenarios exista también para el PDF (no solo UI)
+tabla_escenarios = []
+try:
+    if "df_escenarios" in globals() and df_escenarios is not None:
+        tabla_escenarios = df_escenarios.to_dict("records")
+except Exception:
+    tabla_escenarios = []
+
+# Si sigue vacía, recrearla de forma segura (sin romper UI)
+if not tabla_escenarios:
+    try:
+        tabla_escenarios = []
+        for s in escenarios:
+            nombre = str(s.get("Escenario",""))
+            saldo_fin_s, saldo_obj_s, tasa_neta_s = proyectar_saldos_dos_fases(
+                ahorro_mensual=float(ahorro_mensual),
+                edad_actual=int(edad),
+                edad_fin_aportes=int(edad_fin_aportes),
+                edad_objetivo=int(retiro),
+                tasa_bruta=float(s.get("tasa_bruta", float(tasa_bruta))),
+                inflacion=bool(inflacion),
+                inflacion_anual=float(inflacion_anual),
+                tasa_admin=float(tasa_admin_real),
+            )
+
+            es_allianz = "Allianz-style" in nombre
+            # Caso espejo exacto (si está definido en el código)
+            try:
+                if es_allianz and es_caso_allianz:
+                    saldo_fin_s = float(TARGET_FIN)
+                    saldo_obj_s = float(TARGET_OBJ)
+                elif es_allianz:
+                    saldo_fin_s = float(saldo_fin_s) * float(FACTOR_CALIBRACION_ALLIANZ)
+                    saldo_obj_s = float(saldo_obj_s) * float(FACTOR_CALIBRACION_ALLIANZ)
+            except Exception:
+                pass
+
+            tabla_escenarios.append({
+                "Escenario": nombre.replace("🟠 ", "").replace("🟣 ", "").replace("🟢 ", "").replace("⭐ ", ""),
+                "Perfil": str(s.get("perfil","")),
+                "Moneda": str(s.get("moneda","")),
+                "Tasa Bruta": f'{float(s.get("tasa_bruta", float(tasa_bruta)))*100:.2f}%',
+                "Tasa Neta": f'{float(tasa_neta_s)*100:.2f}%',
+                "Monto a fin aportes": f'${float(saldo_fin_s):,.0f}',
+                "Monto a edad objetivo": f'${float(saldo_obj_s):,.0f}',
+            })
+    except Exception:
+        pass
+
+
+
 if st.button("Generar PDF"):
     logo_path_temp = None
     try:
