@@ -312,21 +312,23 @@ class PDFReport(FPDF):
         self.set_text_color(0, 0, 0)
 
     def footer(self):
-        # Aviso legal (pie de página)
-        self.set_y(-30)
-        self.set_font("Arial", "", 7)
+        # --- Footer compacto para evitar encimarse con el contenido ---
+        # Dejamos un margen inferior amplio con set_auto_page_break(margin=28)
+        # y aquí dibujamos un aviso legal corto + paginación.
+
+        # Aviso legal (compacto)
+        self.set_y(-24)
+        self.set_font("Arial", "", 6)
         self.set_text_color(100, 100, 100)
 
         disclaimer = (
-            "Aviso legal: La presente proyeccion es unicamente informativa y estimativa. "
-            "No constituye una cotizacion formal ni una oferta vinculante por parte de ninguna institucion "
-            "financiera o aseguradora. Los rendimientos no estan garantizados y pueden variar. "
-            "Para obtener una cotizacion oficial y proceder a la contratacion, consulte a su asesor."
+            "Aviso legal: Proyeccion informativa y estimativa. No constituye cotizacion formal ni oferta vinculante. "
+            "Rendimientos no garantizados y pueden variar. Consulte a su asesor para cotizacion oficial."
         )
-        self.multi_cell(0, 3, disclaimer, 0, "C")
+        self.multi_cell(0, 2.8, disclaimer, 0, "C")
 
-        # Paginación
-        self.set_y(-12)
+        # Paginación (separada para que nunca se encime con el texto)
+        self.set_y(-10)
         self.set_text_color(0, 0, 0)
         self.set_font("Arial", "I", 8)
         self.cell(0, 10, f"Pagina {self.page_no()} | Generado con Simulador Krece360", 0, 0, "C")
@@ -413,6 +415,7 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
     try:
         logo_pdf_path = _prepare_logo_for_pdf(ruta_logo_temp)
         pdf = PDFReport(advisor_logo_path=logo_pdf_path)
+        pdf.set_auto_page_break(auto=True, margin=28)
         pdf.add_page()
         
         # --- CORRECCIÓN ESPACIO LOGO ---
@@ -619,14 +622,25 @@ with st.sidebar:
     tasa_bruta_sugerida = tasas_perfil.get(perfil_k360, 0.085)
 
     modo_avanzado = st.checkbox("Modo avanzado: definir tasa manual", value=False)
-    if modo_avanzado:
-        tasa_bruta = st.slider("Tasa Mercado Bruta (%)", 5.0, 15.0, float(tasa_bruta_sugerida*100), step=0.1) / 100.0
-    else:
-        tasa_bruta = float(tasa_bruta_sugerida)
-        st.caption(f"Tasa bruta sugerida para {perfil_k360}: {tasa_bruta*100:.2f}%")
+    # Tasa bruta siempre editable (premium + fácil de actualizar año con año)
+    tasa_bruta = st.slider(
+        "Tasa Mercado Bruta (%)",
+        0.0, 20.0,
+        float(tasa_bruta_sugerida * 100),
+        step=0.1
+    ) / 100.0
+    st.caption(f"Sugerencia por perfil ({perfil_k360}): {tasa_bruta_sugerida*100:.2f}% — puedes ajustarla según mercado/año.")
 
-    inflacion = st.checkbox("Considerar Inflación (4%)", value=True)
-    tasa_inflacion = 0.04 if inflacion else 0.0
+    # Inflación editable (default 5% para alinear con simuladores comerciales tipo Allianz)
+    inflacion = st.checkbox("Considerar Incremento con Inflación", value=True)
+    inflacion_pct = st.number_input(
+        "Inflación anual (%)",
+        min_value=0.0, max_value=15.0,
+        value=5.0,
+        step=0.1,
+        help="Puedes actualizar este supuesto cada año (ej. 5.0%, 4.5%, 6.0%)."
+    )
+    tasa_inflacion = (inflacion_pct / 100.0) if inflacion else 0.0
 
     
     st.markdown("---")
