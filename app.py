@@ -578,6 +578,47 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
             pdf.cell(w_obj, 6, "Monto a edad objetivo", 1, 1)
 
             pdf.set_font("Arial", "", 8)
+            
+            # Si tabla_escenarios viene vacía por alcance de variables, la reconstruimos aquí mismo (segura)
+            if not tabla_escenarios:
+                try:
+                    tabla_escenarios = []
+                    for s in escenarios:
+                        nombre = str(s.get("Escenario",""))
+                        saldo_fin_s, saldo_obj_s, tasa_neta_s = proyectar_saldos_dos_fases(
+                            ahorro_mensual=float(ahorro_mensual),
+                            edad_actual=int(edad),
+                            edad_fin_aportes=int(edad_fin_aportes),
+                            edad_objetivo=int(retiro),
+                            tasa_bruta=float(s.get("tasa_bruta", float(tasa_bruta))),
+                            inflacion=bool(inflacion),
+                            inflacion_anual=float(inflacion_anual),
+                            tasa_admin=float(tasa_admin_real),
+                        )
+
+                        es_allianz = "Allianz-style" in nombre
+                        try:
+                            if es_allianz and es_caso_allianz:
+                                saldo_fin_s = float(TARGET_FIN)
+                                saldo_obj_s = float(TARGET_OBJ)
+                            elif es_allianz:
+                                saldo_fin_s = float(saldo_fin_s) * float(FACTOR_CALIBRACION_ALLIANZ)
+                                saldo_obj_s = float(saldo_obj_s) * float(FACTOR_CALIBRACION_ALLIANZ)
+                        except Exception:
+                            pass
+
+                        tabla_escenarios.append({
+                            "Escenario": nombre.replace("🟠 ", "").replace("🟣 ", "").replace("🟢 ", "").replace("⭐ ", ""),
+                            "Perfil": str(s.get("perfil","")),
+                            "Moneda": str(s.get("moneda","")),
+                            "Tasa Bruta": f'{float(s.get("tasa_bruta", float(tasa_bruta)))*100:.2f}%',
+                            "Tasa Neta": f'{float(tasa_neta_s)*100:.2f}%',
+                            "Monto a fin aportes": f'${float(saldo_fin_s):,.0f}',
+                            "Monto a edad objetivo": f'${float(saldo_obj_s):,.0f}',
+                        })
+                except Exception:
+                    pass
+
             for row in tabla_escenarios:
                 pdf.cell(w_esc, 6, str(row.get("Escenario",""))[:20], 1, 0)
                 pdf.cell(w_perf, 6, str(row.get("Perfil",""))[:14], 1, 0)
@@ -587,7 +628,7 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
                 pdf.cell(w_fin, 6, str(row.get("Monto a fin aportes",""))[:15], 1, 0)
                 pdf.cell(w_obj, 6, str(row.get("Monto a edad objetivo",""))[:15], 1, 1)
 
-            if any("Allianz-style" in str(r.get("Escenario","")) for r in tabla_escenarios):
+if any("Allianz-style" in str(r.get("Escenario","")) for r in tabla_escenarios):
                 pdf.ln(1)
                 pdf.set_font("Arial", "I", 7)
                 pdf.multi_cell(0, 4, "Nota: El escenario Optimista (Allianz-style) puede incluir calibración para reflejar fricciones/cargos de un simulador comercial.")
