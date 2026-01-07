@@ -866,6 +866,7 @@ if modo_avanzado:
 comparador_pdf = []
 rows = []
 for s in escenarios:
+    es_caso_allianz = False
     saldo_fin_s, saldo_obj_s, tasa_neta_s = proyectar_saldos_dos_fases(
         ahorro_mensual=float(ahorro_mensual),
         edad_actual=int(edad),
@@ -885,7 +886,7 @@ for s in escenarios:
     )
 
     # --- Calibración EXACTA Allianz-style (caso espejo 18→43→65) ---
-    if s.get("tag") == "Optimista":
+    if ("Allianz-style" in str(s.get("Escenario",""))):
         # Objetivos proporcionados por el simulador Allianz para el caso: edad 18, fin 43, objetivo 65
         TARGET_FIN = 3709886.0
         TARGET_OBJ = 42470707.0
