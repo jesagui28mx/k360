@@ -905,7 +905,6 @@ for s in escenarios:
             # Pegado exacto a los resultados del simulador Allianz para el caso espejo.
             saldo_fin_s = float(TARGET_FIN)
             saldo_obj_s = float(TARGET_OBJ)
-    })
 
     rows.append({
         "Escenario": s["Escenario"],
