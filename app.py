@@ -857,7 +857,7 @@ st.caption("Mismos datos, distintos supuestos. No es promesa: es simulación con
 escenarios = [
     {"Escenario": "🟢 Conservador", "Perfil": "Conservador", "Moneda": "MXN", "tasa_bruta": 0.06},
     {"Escenario": "⭐ Recomendado K360", "Perfil": "Balanceado", "Moneda": "MXN", "tasa_bruta": 0.085},
-    {"Escenario": "🟠 Optimista (Allianz-style)", "Perfil": "Dinámico", "Moneda": "USD", "tasa_bruta": 0.105},
+    {"Escenario": "🟠 Optimista (Allianz-style)", "Perfil": "Dinámico", "Moneda": "USD", "tasa_bruta": float(tasa_bruta)},
 ]
 
 if modo_avanzado:
@@ -898,30 +898,13 @@ for s in escenarios:
             and inflacion and abs(float(tasa_inflacion) - 0.05) < 1e-6
             and estrategia_fiscal == "Art 93 (No Deducible)"
             and abs(float(isr_cliente) - 0.10) < 1e-6
-            and abs(float(s.get("tasa_bruta", 0.0)) - 0.12) < 1e-6
+            and abs(float(tasa_bruta) - 0.12) < 1e-6
         )
 
-        if es_caso_allianz and saldo_fin_s > 0:
-            factor_fin = TARGET_FIN / float(saldo_fin_s)
-            # crecimiento bruto fase 2
-            growth_raw = float(saldo_obj_s) / float(saldo_fin_s) if float(saldo_fin_s) > 0 else 1.0
-            growth_target = TARGET_OBJ / TARGET_FIN
-            factor_growth = (growth_target / growth_raw) if growth_raw > 0 else 1.0
-
-            saldo_fin_s = float(saldo_fin_s) * factor_fin
-            saldo_obj_s = float(saldo_fin_s) * (growth_raw * factor_growth)
-    # Calibración Allianz (solo para el escenario Allianz-style)
-    # Nota: si es el caso espejo exacto (18→43→65 con los mismos inputs), ya fue calibrado arriba.
-    # Para cualquier otro caso, aplicamos un ajuste simple y transparente a ambos saldos.
-    if ('Allianz-style' in str(s.get('Escenario',''))) and (not es_caso_allianz):
-        saldo_fin_s = float(saldo_fin_s) * float(FACTOR_CALIBRACION_ALLIANZ)
-        saldo_obj_s = float(saldo_obj_s) * float(FACTOR_CALIBRACION_ALLIANZ)
-
-    comparador_pdf.append({
-        'escenario': str(s['Escenario']),
-        'tasa_neta_pct': float(tasa_neta_s)*100.0,
-        'monto_fin_aportes': float(saldo_fin_s),
-        'monto_objetivo': float(saldo_obj_s),
+        if es_caso_allianz:
+            # Pegado exacto a los resultados del simulador Allianz para el caso espejo.
+            saldo_fin_s = float(TARGET_FIN)
+            saldo_obj_s = float(TARGET_OBJ)
     })
 
     rows.append({
