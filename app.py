@@ -490,6 +490,81 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         pdf.cell(0, 10, f"   Beneficio SAT Estimado: ${datos_fin['beneficio_sat']:,.2f}", 0, 1) # Aquí va el dato corregido
         pdf.set_font("Arial", 'I', 10)
         pdf.cell(0, 10, f"   (Tasa Admin Aplicada: {datos_fin['tasa_admin_pct']:.2f}%)", 0, 1)
+
+        # -----------------------------
+        # Comparación de escenarios (PDF) — 2 columnas
+        # -----------------------------
+        try:
+            # Construir tabla para el PDF (independiente del UI)
+            tabla_escenarios_pdf = []
+            for s in escenarios:
+                nombre = str(s.get("Escenario", ""))
+                saldo_fin_s, saldo_obj_s, tasa_neta_s = proyectar_saldos_dos_fases(
+                    ahorro_mensual=float(ahorro_mensual),
+                    edad_actual=int(edad),
+                    edad_fin_aportes=int(edad_fin_aportes),
+                    edad_objetivo=int(retiro),
+                    tasa_bruta=float(s.get("tasa_bruta", float(tasa_bruta))),
+                    inflacion=bool(inflacion),
+                    inflacion_anual=float(inflacion_anual),
+                    tasa_admin=float(tasa_admin_real),
+                )
+        
+                es_allianz = "Allianz-style" in nombre
+                try:
+                    if es_allianz and es_caso_allianz:
+                        saldo_fin_s = float(TARGET_FIN)
+                        saldo_obj_s = float(TARGET_OBJ)
+                    elif es_allianz:
+                        saldo_fin_s = float(saldo_fin_s) * float(FACTOR_CALIBRACION_ALLIANZ)
+                        saldo_obj_s = float(saldo_obj_s) * float(FACTOR_CALIBRACION_ALLIANZ)
+                except Exception:
+                    pass
+        
+                tabla_escenarios_pdf.append({
+                    "Escenario": nombre.replace("🟠 ", "").replace("🟣 ", "").replace("🟢 ", "").replace("⭐ ", ""),
+                    "Perfil": str(s.get("perfil", "")),
+                    "Moneda": str(s.get("moneda", "")),
+                    "Tasa Bruta": f'{float(s.get("tasa_bruta", float(tasa_bruta)))*100:.2f}%',
+                    "Tasa Neta": f'{float(tasa_neta_s)*100:.2f}%',
+                    "Monto a fin aportes": f'${float(saldo_fin_s):,.0f}',
+                    "Monto a edad objetivo": f'${float(saldo_obj_s):,.0f}',
+                })
+        
+            pdf.ln(4)
+            pdf.set_font("Arial", "B", 11)
+            pdf.cell(0, 8, "Comparación de escenarios (resumen)", 0, 1)
+            pdf.set_font("Arial", "", 8)
+            pdf.multi_cell(0, 4, "Mismos datos, distintos supuestos. No es promesa: es simulación con diferentes niveles de riesgo.")
+            pdf.ln(1)
+        
+            pdf.set_font("Arial", "B", 7)
+            w_esc, w_perf, w_mon, w_tb, w_tn, w_fin, w_obj = 32, 18, 10, 12, 12, 53, 53
+            pdf.cell(w_esc, 5, "Escenario", 1, 0)
+            pdf.cell(w_perf, 5, "Perfil", 1, 0)
+            pdf.cell(w_mon, 5, "Mon", 1, 0)
+            pdf.cell(w_tb, 5, "Bruta", 1, 0)
+            pdf.cell(w_tn, 5, "Neta", 1, 0)
+            pdf.cell(w_fin, 5, "Monto a fin aportes", 1, 0)
+            pdf.cell(w_obj, 5, "Monto a edad objetivo", 1, 1)
+        
+            pdf.set_font("Arial", "", 7)
+            for row in tabla_escenarios_pdf:
+                pdf.cell(w_esc, 5, str(row.get("Escenario",""))[:18], 1, 0)
+                pdf.cell(w_perf, 5, str(row.get("Perfil",""))[:12], 1, 0)
+                pdf.cell(w_mon, 5, str(row.get("Moneda",""))[:3], 1, 0)
+                pdf.cell(w_tb, 5, str(row.get("Tasa Bruta",""))[:7], 1, 0)
+                pdf.cell(w_tn, 5, str(row.get("Tasa Neta",""))[:7], 1, 0)
+                pdf.cell(w_fin, 5, str(row.get("Monto a fin aportes",""))[:18], 1, 0)
+                pdf.cell(w_obj, 5, str(row.get("Monto a edad objetivo",""))[:18], 1, 1)
+        
+            if any("Allianz-style" in str(r.get("Escenario","")) for r in tabla_escenarios_pdf):
+                pdf.ln(1)
+                pdf.set_font("Arial", "I", 6)
+                pdf.multi_cell(0, 3, "Nota: El escenario Optimista (Allianz-style) puede incluir calibración para reflejar fricciones/cargos de un simulador comercial.")
+        except Exception:
+            pass
+
         
 
         pdf.set_y(y_actual + 50)
