@@ -860,6 +860,17 @@ escenarios = [
     {"Escenario": "🟠 Optimista (Allianz-style)", "Perfil": "Dinámico", "Moneda": "USD", "tasa_bruta": float(tasa_bruta)},
 ]
 
+# Salvaguarda: si por alguna razón se perdió algún escenario, lo restauramos
+try:
+    nombres = {str(x.get("Escenario","")) for x in escenarios}
+    if not any("Conservador" in n for n in nombres):
+        escenarios.insert(0, {"Escenario": "🟢 Conservador", "Perfil": "Conservador", "Moneda": "MXN", "tasa_bruta": 0.06})
+    if not any("Recomendado K360" in n for n in nombres):
+        escenarios.insert(1, {"Escenario": "⭐ Recomendado K360", "Perfil": "Balanceado", "Moneda": "MXN", "tasa_bruta": 0.085})
+except Exception:
+    pass
+
+
 if modo_avanzado:
     escenarios.insert(2, {"Escenario": "🟣 Personalizado (tu tasa)", "Perfil": "Manual", "Moneda": "—", "tasa_bruta": float(tasa_bruta)})
 
@@ -919,9 +930,9 @@ for s in escenarios:
         pass
 
 rows.append({
-        "Escenario": s["Escenario"],
-        "Perfil": s["Perfil"],
-        "Moneda": s["Moneda"],
+        "Escenario": s.get("Escenario",""),
+        "Perfil": s.get("Perfil",""),
+        "Moneda": s.get("Moneda",""),
         "Tasa Bruta": f"{float(s['tasa_bruta'])*100:.2f}%",
         "Tasa Neta (bruta - admin)": f"{float(tasa_neta_s)*100:.2f}%",
         "Monto a fin aportes": f"${float(saldo_fin_s):,.0f}",
