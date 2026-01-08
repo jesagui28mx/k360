@@ -456,7 +456,7 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         pdf.set_font("Arial", size=12)
         
         # Datos Cliente
-        pdf.set_font("Arial", 'B', 13)
+        pdf.set_font("Arial", 'B', 12)
         pdf.cell(0, 10, f"Propuesta para: {datos_cliente['nombre']}", 0, 1)
         pdf.set_font("Arial", size=12)
         pdf.cell(0, 10, f"Edad Actual: {datos_cliente['edad']} | Fin aportaciones: {datos_cliente.get('edad_fin_aportes', datos_cliente['retiro'])} | Edad objetivo: {datos_cliente['retiro']}", 0, 1)
@@ -464,7 +464,7 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         pdf.ln(5)
 
         # Resumen de la estrategia
-        pdf.set_font("Arial", 'B', 11)
+        pdf.set_font("Arial", 'B', 10)
         pdf.cell(0, 8, "Resumen de la estrategia", 0, 1)
         pdf.set_font("Arial", size=9)
         resumen = (
@@ -473,7 +473,7 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
             "periódicas, un horizonte de largo plazo y el tratamiento fiscal conforme a la legislación vigente. "
             "Los resultados son estimativos y no representan una garantía de rendimiento futuro."
         )
-        pdf.multi_cell(0, 3.5, resumen)
+        pdf.multi_cell(0, 3.0, resumen)
         pdf.ln(2)
 
         # Resumen Financiero
@@ -481,8 +481,8 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         y_actual = pdf.get_y()
         pdf.rect(10, y_actual, 190, 45, 'F') # Ajusté un poco la altura
         
-        pdf.set_y(y_actual + 4)
-        pdf.set_font("Arial", 'B', 12)
+        pdf.set_y(y_actual + 3)
+        pdf.set_font("Arial", 'B', 11)
         pdf.cell(0, 10, f"   Aportación Mensual: ${datos_fin['aporte_mensual']:,.2f}", 0, 1)
         pdf.cell(0, 10, f"   Total aportado estimado: ${datos_fin['total_aportado']:,.2f}", 0, 1)
         pdf.cell(0, 10, f"   Saldo al fin de aportaciones: ${datos_fin.get('saldo_fin_aportes', 0.0):,.2f}", 0, 1)
@@ -492,7 +492,7 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         pdf.cell(0, 10, f"   (Tasa Admin Aplicada: {datos_fin['tasa_admin_pct']:.2f}%)", 0, 1)
         
 
-        pdf.set_y(y_actual + 50)
+        pdf.set_y(y_actual + 30)
 
         # Comparador de Escenarios (mini-tabla)
         comp = datos_fin.get('comparador') if isinstance(datos_fin, dict) else None
