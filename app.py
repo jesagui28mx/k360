@@ -451,20 +451,20 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         pdf.add_page()
         
         # --- CORRECCIÓN ESPACIO LOGO ---
-        pdf.ln(8) 
+        pdf.ln(2) 
         
         pdf.set_font("Arial", size=12)
         
         # Datos Cliente
-        pdf.set_font("Arial", 'B', 12)
+        pdf.set_font("Arial", 'B', 14)
         pdf.cell(0, 10, f"Propuesta para: {datos_cliente['nombre']}", 0, 1)
         pdf.set_font("Arial", size=12)
         pdf.cell(0, 10, f"Edad Actual: {datos_cliente['edad']} | Fin aportaciones: {datos_cliente.get('edad_fin_aportes', datos_cliente['retiro'])} | Edad objetivo: {datos_cliente['retiro']}", 0, 1)
         pdf.cell(0, 10, f"Estrategia: {datos_cliente['estrategia']}", 0, 1)
-        pdf.ln(5)
+        pdf.ln(2)
 
         # Resumen de la estrategia
-        pdf.set_font("Arial", 'B', 10)
+        pdf.set_font("Arial", 'B', 12)
         pdf.cell(0, 8, "Resumen de la estrategia", 0, 1)
         pdf.set_font("Arial", size=9)
         resumen = (
@@ -473,7 +473,7 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
             "periódicas, un horizonte de largo plazo y el tratamiento fiscal conforme a la legislación vigente. "
             "Los resultados son estimativos y no representan una garantía de rendimiento futuro."
         )
-        pdf.multi_cell(0, 3.0, resumen)
+        pdf.multi_cell(0, 4.5, resumen)
         pdf.ln(2)
 
         # Resumen Financiero
@@ -481,8 +481,8 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         y_actual = pdf.get_y()
         pdf.rect(10, y_actual, 190, 45, 'F') # Ajusté un poco la altura
         
-        pdf.set_y(y_actual + 3)
-        pdf.set_font("Arial", 'B', 11)
+        pdf.set_y(y_actual + 5)
+        pdf.set_font("Arial", 'B', 12)
         pdf.cell(0, 10, f"   Aportación Mensual: ${datos_fin['aporte_mensual']:,.2f}", 0, 1)
         pdf.cell(0, 10, f"   Total aportado estimado: ${datos_fin['total_aportado']:,.2f}", 0, 1)
         pdf.cell(0, 10, f"   Saldo al fin de aportaciones: ${datos_fin.get('saldo_fin_aportes', 0.0):,.2f}", 0, 1)
@@ -492,14 +492,14 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         pdf.cell(0, 10, f"   (Tasa Admin Aplicada: {datos_fin['tasa_admin_pct']:.2f}%)", 0, 1)
         
 
-        pdf.set_y(y_actual + 30)
+        pdf.set_y(y_actual + 50)
 
         # Comparador de Escenarios (mini-tabla)
         comp = datos_fin.get('comparador') if isinstance(datos_fin, dict) else None
         if comp and isinstance(comp, list):
             try:
                 pdf.ln(2)
-                pdf.set_font("Arial", 'B', 10)
+                pdf.set_font("Arial", 'B', 11)
                 pdf.cell(0, 8, "Comparación de escenarios (resumen):", 0, 1)
 
                 # Encabezados
@@ -552,23 +552,23 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
 
         # Análisis Fiscal
 
-        pdf.set_font("Arial", 'B', 11)
+        pdf.set_font("Arial", 'B', 12)
         pdf.cell(0, 8, "Análisis fiscal simplificado:", 0, 1)
-        pdf.set_font("Arial", size=10)
+        pdf.set_font("Arial", size=11)
         pdf.multi_cell(0, 6, datos_fiscales['texto_analisis'])
         
         if datos_fiscales['alerta_excedente']:
-            pdf.ln(5)
+            pdf.ln(2)
             pdf.set_text_color(200, 0, 0)
             pdf.multi_cell(0, 6, f"NOTA IMPORTANTE: {datos_fiscales['alerta_excedente']}")
             pdf.set_text_color(0, 0, 0)
             
 
         # Siguiente paso recomendado
-        pdf.ln(6)
-        pdf.set_font("Arial", 'B', 10)
+        pdf.ln(2)
+        pdf.set_font("Arial", 'B', 12)
         pdf.cell(0, 8, "Siguiente paso recomendado", 0, 1)
-        pdf.set_font("Arial", size=9)
+        pdf.set_font("Arial", size=10)
         pdf.multi_cell(
             0, 5,
             "Revisa esta proyección junto con tu asesor para validar si esta estrategia se ajusta a tus objetivos "
@@ -577,14 +577,14 @@ def crear_pdf(datos_cliente, datos_fin, datos_fiscales, datos_asesor, ruta_logo_
         )
 
         # Firma Asesor
-        pdf.ln(8)
+        pdf.ln(2)
         pdf.set_draw_color(150, 150, 150)
         pdf.line(10, pdf.get_y(), 200, pdf.get_y()) 
-        pdf.ln(5)
+        pdf.ln(2)
         
-        pdf.set_font("Arial", 'B', 10)
+        pdf.set_font("Arial", 'B', 12)
         pdf.cell(0, 8, "Asesor Certificado:", 0, 1)
-        pdf.set_font("Arial", size=10)
+        pdf.set_font("Arial", size=12)
         pdf.cell(0, 8, f"{datos_asesor['nombre']}", 0, 1)
         pdf.cell(0, 8, f"Contacto: {datos_asesor['telefono']}", 0, 1)
 
@@ -808,7 +808,7 @@ elif estrategia_fiscal == "Art 93 (No Deducible)":
 
 # --- 4. INTERFAZ PRINCIPAL ---
 
-st.title("🛡️ Simulador Krece360 - OptiMaxx")
+st.title("🛡️ Simulador Krece360")
 st.markdown("Herramienta de proyección financiera.")
 
 # Alerta Visual (Amarilla)
